@@ -29,11 +29,19 @@ override_dh_auto_build:
 # Override dh_auto_test to run tests and report status explicitly (temporary for diagnostics)
 override_dh_auto_test:
 	@echo "Running tests via override_dh_auto_test (temporary for diagnostics)..."
-	if $(MAKE) test; then \
-	    echo "INFO: Tests passed with exit code 0."; \
+	@echo "Attempting to run tests with NO_COLOR=1 and capturing output to test_output.log"
+	# Try to disable colors and redirect all output to a file
+	if NO_COLOR=1 $(MAKE) test > test_output.log 2>&1; then \
+	    echo "INFO: Tests completed with exit code 0 (presumed pass)."; \
+	    echo "-------------------- Full Test Output Start --------------------"; \
+	    cat test_output.log || echo "INFO: test_output.log not found or unreadable."; \
+	    echo "-------------------- Full Test Output End ----------------------"; \
 	else \
 	    TEST_EXIT_CODE=$$?; \
-	    echo "ERROR: Tests failed with exit code $${TEST_EXIT_CODE}. See output above for details."; \
+	    echo "ERROR: Tests completed with exit code $${TEST_EXIT_CODE}."; \
+	    echo "-------------------- Full Test Output Start --------------------"; \
+	    cat test_output.log || echo "INFO: test_output.log not found or unreadable."; \
+	    echo "-------------------- Full Test Output End ----------------------"; \
 	    exit $${TEST_EXIT_CODE}; \
 	fi
 
