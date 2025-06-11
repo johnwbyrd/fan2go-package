@@ -19,16 +19,24 @@ UPSTREAM_SRC_DIR := $(CURDIR)/_upstream_src
 %:
 	dh $@ --with golang
 
+# Override dh_auto_clean to call upstream's clean target but ignore errors.
+# This ensures that the 'debian/rules clean' operation, called by dpkg-buildpackage,
+# correctly handles the upstream clean process.
+override_dh_auto_clean:
+	@echo "Running overridden dh_auto_clean to clean upstream..."
+	-$(MAKE) -C $(UPSTREAM_SRC_DIR) clean
+
 # Override the build step to use upstream's Makefile.
 # This assumes the upstream Makefile has a 'build' target.
+# The upstream cleaning is now handled by the 'debian/rules clean' target via override_dh_auto_clean.
 override_dh_auto_build:
+	@echo "Running overridden dh_auto_build to build upstream..."
 	# Pass necessary version information if upstream Makefile uses it.
 	# Example: $(MAKE) -C $(UPSTREAM_SRC_DIR) build VERSION=$(VERSION) GIT_REV=$(GIT_REV)
 	# For fan2go, its Makefile seems to determine these internally or via env vars.
 	# The fan2go Makefile uses VERSION?=0.10.0, GIT_REV, DATE, etc.
 	# We can let it use its defaults or try to override them if our package versioning dictates.
 	# For now, let it use its internal logic for version embedding.
-	-$(MAKE) -C $(UPSTREAM_SRC_DIR) clean # Clean upstream first, ignore errors from this specific command
 	$(MAKE) -C $(UPSTREAM_SRC_DIR) build
 
 # Override the install step:
