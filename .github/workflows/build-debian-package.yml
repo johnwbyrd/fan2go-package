@@ -1,5 +1,8 @@
 name: Build Debian Package
 
+permissions:
+  contents: write # Needed to create/update releases and tags
+
 on:
   push:
     branches:
@@ -147,6 +150,7 @@ jobs:
           files: |
             fan2go-package/*.deb
             fan2go-package/*.changes
-            fan2go-package/test_output_*.log # Optional: also upload the full test log to the release
+            fan2go-package/test_output_*.log 
+            # The above line includes the full test log in the release assets.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
