@@ -1,0 +1,96 @@
+#!/bin/sh
+# postinst script for fan2go
+#
+# see: dh_installdeb(1)
+
+set -e
+
+# summary of how this script can be called:
+#        * <new-postinst> `configure' <most-recently-configured-version>
+#        * <new-postinst> `abort-upgrade' <new-version>
+#        * <new-postinst> `abort-remove'
+#        * <new-postinst> `abort-deconfigure' <in-favour-of-package> <new-version>
+#          <removing-package> <version>
+# for details, see http://www.debian.org/doc/debian-policy/footnotes.html#fn-3
+# and /usr/share/doc/debian-policy/examples/maintainer-script.example
+
+FAN2GO_USER="fan2go"
+FAN2GO_GROUP="fan2go"
+FAN2GO_HOME="/var/lib/fan2go"
+FAN2GO_LOG_DIR="/var/log/fan2go"
+
+case "$1" in
+    configure)
+        # Create the fan2go group if it doesn't exist
+        if ! getent group "$FAN2GO_GROUP" >/dev/null; then
+            addgroup --system "$FAN2GO_GROUP" --quiet
+        fi
+
+        # Create the fan2go user if it doesn't exist
+        if ! getent passwd "$FAN2GO_USER" >/dev/null; then
+            adduser \
+                --system \
+                --disabled-login \
+                --ingroup "$FAN2GO_GROUP" \
+                --home "$FAN2GO_HOME" \
+                --no-create-home \
+                --shell /usr/sbin/nologin \
+                "$FAN2GO_USER"
+        fi
+
+        # Create home directory for fan2go if it doesn't exist and set permissions
+        if [ ! -d "$FAN2GO_HOME" ]; then
+            mkdir -p "$FAN2GO_HOME"
+            chown "$FAN2GO_USER":"$FAN2GO_GROUP" "$FAN2GO_HOME"
+            chmod 750 "$FAN2GO_HOME"
+        fi
+        
+        # Create log directory for fan2go if it doesn't exist and set permissions
+        if [ ! -d "$FAN2GO_LOG_DIR" ]; then
+            mkdir -p "$FAN2GO_LOG_DIR"
+        fi
+        chown "$FAN2GO_USER":"$FAN2GO_GROUP" "$FAN2GO_LOG_DIR"
+        chmod 750 "$FAN2GO_LOG_DIR"
+
+
+        # Reload udev rules
+        if [ -x /sbin/udevadm ]; then
+            udevadm control --reload-rules || true
+            udevadm trigger --subsystem-match=hwmon || true
+        fi
+
+        # Reload systemd manager configuration and restart service
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload || true
+            # Enable and try to start the service.
+            # deb-systemd-invoke might be preferred here if using dh_systemd_enable/start
+            # but direct calls are also common.
+            if [ -n "$2" ]; then # $2 is <most-recently-configured-version>
+                # This is an upgrade or reconfigure
+                deb-systemd-invoke try-restart fan2go.service || true
+            else
+                # This is a new install
+                deb-systemd-invoke enable fan2go.service || true
+                deb-systemd-invoke start fan2go.service || true
+            fi
+        fi
+
+        # The default configuration file /etc/fan2go/fan2go.yaml is installed
+        # via debian/fan2go.install and handled by dpkg as a conffile.
+        # The directory /etc/fan2go is created by dh_installdirs or dh_install.
+        # Permissions on the conffile are handled by dh_fixperms.
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+# dh_installdeb will call update-rc.d correctly for init scripts
+# and systemd scripts automatically if using debhelper compat >= 9
+
+exit 0

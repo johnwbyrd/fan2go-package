@@ -1,0 +1,8 @@
+# Grant fan2go group read/write access to hwmon temperature sensors and pwm controls
+SUBSYSTEM=="hwmon", GROUP="fan2go", MODE="0664"
+# The above rule should cover both temp*_input, fan*_input and pwm* files within hwmon directories.
+# If more specific matching is needed, KERNEL attributes can be used, for example:
+# KERNEL=="temp*_input", SUBSYSTEM=="hwmon", GROUP="fan2go", MODE="0664"
+# KERNEL=="pwm*", SUBSYSTEM=="hwmon", GROUP="fan2go", MODE="0664"
+# KERNEL=="fan*_input", SUBSYSTEM=="hwmon", GROUP="fan2go", MODE="0664"
+# However, the single SUBSYSTEM rule is generally sufficient and cleaner.

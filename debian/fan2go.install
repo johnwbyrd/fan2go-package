@@ -1,0 +1,21 @@
+# Install the fan2go binary
+# Assuming the binary is built by 'go build' and is named 'fan2go'
+# dh_golang usually places this in a temporary install dir like debian/fan2go/usr/go/bin/
+# Or, if the go project installs to $GOBIN, it might be $GOBIN/fan2go.
+# We need to ensure it's taken from the correct build location.
+# For now, let's assume dh_golang puts it where dh_install can find it relative to the package root.
+# If the binary is built in the root of the project as 'fan2go':
+# fan2go usr/bin
+
+# A more robust way, assuming dh_golang correctly installs it into the package's staging area:
+# This path might need adjustment depending on how debian/rules stages the binary.
+# If debian/rules places the compiled binary directly into debian/fan2go/usr/bin/fan2go,
+# then this line might not even be needed, or it would be just 'usr/bin/fan2go'.
+# This line tells dh_install to look for 'debian/fan2go/usr/bin/fan2go' and install it.
+# The destination /usr/bin/ is implicit.
+usr/bin/fan2go
+
+# Install our default Debian configuration file
+# This takes debian/fan2go.yaml from our packaging files and installs it
+# as /etc/fan2go/fan2go.yaml in the final package.
+debian/fan2go.yaml etc/fan2go/

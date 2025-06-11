@@ -1,0 +1,70 @@
+# Default configuration for fan2go Debian package
+# Main configuration file for fan2go
+# For detailed explanations of all options, please refer to the
+# upstream fan2go documentation or the example config from the upstream project.
+
+# Path to the fan2go database file.
+# The fan2go user (service runs as 'fan2go') must have write access to this location.
+# The /var/lib/fan2go directory is created by the package installer with correct permissions.
+dbPath: /var/lib/fan2go/fan2go.db
+
+# Log level: "trace", "debug", "info", "warn", "error", "fatal", "panic"
+logLevel: "info"
+
+# Interval in seconds for checking temperatures and adjusting fans
+checkInterval: 2
+
+# Optional REST API configuration
+# restApi:
+#   enabled: false
+#   address: "localhost:8080"
+#   user: "" # Basic auth username, empty for no auth
+#   pass: "" # Basic auth password, empty for no auth
+
+# Sensor configurations
+sensors:
+  # Example: CPU Temperature (hwmon)
+  # - id: cpu_temp
+  #   type: hwmon
+  #   params:
+  #     # Use 'fan2go detect' to find the correct platform and sensor label/name
+  #     platform: "coretemp-isa-0000" # Example, replace with your actual platform
+  #     name: "Package id 0"          # Example, replace with your actual sensor name/label
+  #     # Or use path directly if known and stable:
+  #     # path: "/sys/class/hwmon/hwmonX/tempY_input"
+
+  # Example: GPU Temperature (nvidia) - requires NVML support compiled in
+  # - id: gpu_temp
+  #   type: nvidia
+  #   params:
+  #     gpuUUID: "GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Replace with your GPU's UUID
+
+# Fan configurations
+fans:
+  # Example: CPU Fan (hwmon)
+  # - id: cpu_fan
+  #   type: hwmon
+  #   params:
+  #     # Use 'fan2go detect' to find the correct platform and pwm path/label
+  #     platform: "coretemp-isa-0000" # Example, must match a sensor's platform for auto-association or be specific
+  #     path: "/sys/class/hwmon/hwmonX/pwmY" # Example, replace with your actual PWM control path
+  #     # Optional: if you want to read fan speed
+  #     # rpmPath: "/sys/class/hwmon/hwmonX/fanY_input"
+
+# Curve definitions (linking sensors to fans)
+curves:
+  # Example: Control cpu_fan based on cpu_temp
+  # - fanId: cpu_fan
+  #   sensorId: cpu_temp
+  #   # Linear curve: [[temp1, speed1], [temp2, speed2], ...]
+  #   # Speeds are in percent (0-100)
+  #   linear:
+  #     points:
+  #       - [30, 20]  # At 30C, fan at 20%
+  #       - [50, 40]  # At 50C, fan at 40%
+  #       - [70, 80]  # At 70C, fan at 80%
+  #       - [80, 100] # At 80C, fan at 100%
+  #   # Optional: Minimum fan speed for this curve
+  #   minSpeed: 20
+  #   # Optional: Maximum fan speed for this curve
+  #   maxSpeed: 100

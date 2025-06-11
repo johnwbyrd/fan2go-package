@@ -1,0 +1,23 @@
+[Unit]
+Description=fan2go system fan controller
+After=network.target syslog.target lm_sensors.service
+Wants=lm_sensors.service
+
+[Service]
+Type=simple
+User=fan2go
+Group=fan2go
+ExecStart=/usr/bin/fan2go --config /etc/fan2go/fan2go.yaml
+Restart=on-failure
+
+# Security Hardening
+ProtectSystem=strict
+PrivateTmp=true
+NoNewPrivileges=true
+# ProtectHome=true # Consider if fan2go needs home directory access (likely not)
+# ProtectKernelModules=true # fan2go reads from /sys, doesn't load modules
+ReadWritePaths=/var/lib/fan2go /var/log/fan2go /sys/class/hwmon
+# AmbientCapabilities= # If specific capabilities are needed beyond user/group permissions
+
+[Install]
+WantedBy=multi-user.target

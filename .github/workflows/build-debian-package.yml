@@ -1,0 +1,133 @@
+name: Build Debian Package
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # We'll use Docker for the actual Debian environment
+
+    strategy:
+      matrix:
+        # For now, only Debian Bookworm. Can expand later.
+        dist: [bookworm]
+        arch: [amd64] # Can expand to arm64 later with QEMU or dedicated runners
+
+    container:
+      image: debian:${{ matrix.dist }}
+
+    steps:
+      - name: Checkout fan2go-package (this repo)
+        uses: actions/checkout@v4
+        with:
+          path: fan2go-package # Checkout this packaging repo
+
+      - name: Determine Upstream fan2go Version/Tag
+        id: upstream_version
+        run: |
+          # Default to 'master' branch of upstream for non-tag pushes
+          UPSTREAM_REF="master"
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+            # For tagged pushes on this repo, assume the same tag exists upstream
+            UPSTREAM_REF="${{ github.ref_name }}"
+            echo "Using upstream tag: $UPSTREAM_REF based on this repo's tag."
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PRs, you might want to build against upstream master or a specific PR branch
+            # For simplicity, using master for PRs now.
+            echo "Building PR against upstream master."
+          else
+            echo "Building non-tag push against upstream master."
+          fi
+          echo "UPSTREAM_REF=${UPSTREAM_REF}" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Checkout upstream fan2go source
+        uses: actions/checkout@v4
+        with:
+          repository: markusressel/fan2go # The upstream fan2go repository
+          ref: ${{ steps.upstream_version.outputs.UPSTREAM_REF }}
+          path: fan2go-package/_upstream_src # Checkout into the path expected by debian/rules
+
+      - name: Install build dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            build-essential \
+            debhelper \
+            dh-golang \
+            golang-go \
+            devscripts \
+            lintian \
+            git \
+            ca-certificates
+        shell: bash
+
+      - name: Prepare packaging files
+        run: |
+          # Copy the debian directory from our packaging repo into the upstream source checkout
+          # because dpkg-buildpackage expects it there.
+          cp -r fan2go-package/debian fan2go-package/_upstream_src/
+        shell: bash
+      
+      - name: Update changelog for release builds (optional)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cd fan2go-package/_upstream_src
+          # Extract version from tag (e.g., v0.1.0 -> 0.1.0)
+          DEB_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+          # Use dch to add a new entry. Adjust distribution as needed.
+          dch --newversion "${DEB_VERSION}-1~${{ matrix.dist }}1" --distribution "${{ matrix.dist }}" "New upstream release ${DEB_VERSION}."
+          dch --release "" # Close the entry
+          cat debian/changelog
+        shell: bash
+
+      - name: Build the Debian package
+        run: |
+          cd fan2go-package/_upstream_src # dpkg-buildpackage runs from the source root
+          # -us -uc: don't sign source and changes (signing .deb happens later if needed for repo)
+          # -b: binary-only build
+          dpkg-buildpackage -us -uc -b
+        shell: bash
+
+      - name: List generated files
+        run: ls -l fan2go-package/ # List files in the parent dir where .deb will be placed
+        shell: bash
+
+      - name: Run Lintian
+        run: |
+          # Lintian expects .changes file, which is one level up from _upstream_src
+          lintian ../*.changes || echo "Lintian found issues, but continuing."
+        working-directory: fan2go-package/_upstream_src
+        shell: bash
+        continue-on-error: true # Don't fail the build on lintian errors for now
+
+      - name: Upload Debian package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fan2go-${{ matrix.dist }}-${{ matrix.arch }}-${{ github.ref_name }}
+          path: |
+            fan2go-package/*.deb
+            fan2go-package/*.changes
+            fan2go-package/*.buildinfo
+            # Add lintian log if generated to a file
+          retention-days: 7
+
+      - name: Create GitHub Release and Upload Assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          # body_path: fan2go-package/_upstream_src/debian/changelog # Or generate release notes
+          files: |
+            fan2go-package/*.deb
+            fan2go-package/*.changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

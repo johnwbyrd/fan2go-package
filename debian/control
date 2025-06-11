@@ -1,0 +1,30 @@
+Source: fan2go
+Section: utils
+Priority: optional
+Maintainer: John Byrd <johnwbyrd@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               golang-go,
+               dh-golang
+Standards-Version: 4.6.2
+Vcs-Git: https://www.github.com/johnwbyrd/fan2go-package.git
+Vcs-Browser: https://www.github.com/johnwbyrd/fan2go-package
+Homepage: https://github.com/markusressel/fan2go
+
+Package: fan2go
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+         lm-sensors,
+         systemd
+Description: Fan control daemon based on lm-sensors
+ fan2go is a utility to control system fans based on temperature readings
+ from lm-sensors. It provides configurable fan curves and can run as a
+ systemd service.
+ .
+ This package provides:
+  * The fan2go daemon binary.
+  * A default configuration file at /etc/fan2go/fan2go.yaml, pre-configured
+    to use /var/lib/fan2go/fan2go.db for its database.
+  * A systemd service unit (fan2go.service) for managing the daemon.
+  * udev rules to grant necessary hardware access to a dedicated 'fan2go' user.
+  * Creation of the 'fan2go' system user and group, with a home directory
+    at /var/lib/fan2go for runtime data.

@@ -1,0 +1,64 @@
+#!/bin/sh
+# postrm script for fan2go
+#
+# see: dh_installdeb(1)
+
+set -e
+
+# summary of how this script can be called:
+#        * <old-postrm> `remove'
+#        * <new-postrm> `purge'
+#        * <new-postrm> `disappear' <overwriter> <version>
+#        * <new-postrm> `failed-upgrade' <old-version>
+#        * <new-postrm> `abort-install' <partial-install-version>
+#        * <new-postrm> `abort-upgrade' <new-version>
+# for details, see http://www.debian.org/doc/debian-policy/footnotes.html#fn-3
+# and /usr/share/doc/debian-policy/examples/maintainer-script.example
+
+FAN2GO_USER="fan2go"
+FAN2GO_GROUP="fan2go"
+FAN2GO_HOME="/var/lib/fan2go"
+FAN2GO_LOG_DIR="/var/log/fan2go"
+
+case "$1" in
+    purge)
+        # Remove the fan2go user and group if they exist
+        if getent passwd "$FAN2GO_USER" >/dev/null; then
+            deluser --quiet "$FAN2GO_USER" || true # Ignore error if user is logged in (should not happen for system user)
+        fi
+        if getent group "$FAN2GO_GROUP" >/dev/null; then
+            delgroup --quiet "$FAN2GO_GROUP" || true # Ignore error if group is not empty (should not happen if user removed)
+        fi
+
+        # Remove home and log directories
+        if [ -d "$FAN2GO_HOME" ]; then
+            rm -rf "$FAN2GO_HOME"
+        fi
+        if [ -d "$FAN2GO_LOG_DIR" ]; then
+            rm -rf "$FAN2GO_LOG_DIR"
+        fi
+        
+        # Reload systemd manager configuration
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload || true
+        fi
+    ;;
+
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        # On remove (but not purge), ensure the service is disabled.
+        # dh_systemd_disable should handle this.
+        if [ "$1" = "remove" ] && [ -d /run/systemd/system ]; then
+             deb-systemd-invoke disable fan2go.service || true
+        fi
+    ;;
+
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+# dh_installdeb will call update-rc.d correctly for init scripts
+# and systemd scripts automatically if using debhelper compat >= 9
+
+exit 0

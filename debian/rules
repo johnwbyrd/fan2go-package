@@ -1,0 +1,55 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE=1
+
+# Define the directory where the upstream fan2go source code is located.
+# For local builds, you would need to ensure the fan2go source is cloned/copied here.
+# For GitHub Actions, the workflow would handle checking out the upstream source to this path.
+UPSTREAM_SRC_DIR := $(CURDIR)/_upstream_src
+# Alternatively, if the debian directory is moved into the upstream source tree:
+# UPSTREAM_SRC_DIR := $(CURDIR)/..
+
+# Get package version from changelog for passing to the build, if needed by upstream Makefile
+# VERSION := $(shell dpkg-parsechangelog -S Version | sed 's/-[^-]*$$//')
+# GIT_REV := $(shell dpkg-parsechangelog -S Version | sed 's/^[0-9.]*-//') # Example if git rev is in debian version
+
+# Standard debhelper sequence with Go support.
+# We override specific steps (build, install) to use the upstream Makefile
+# and handle the binary placement.
+%:
+	dh $@ --with golang
+
+# Override the build step to use upstream's Makefile.
+# This assumes the upstream Makefile has a 'build' target.
+override_dh_auto_build:
+	# Pass necessary version information if upstream Makefile uses it.
+	# Example: $(MAKE) -C $(UPSTREAM_SRC_DIR) build VERSION=$(VERSION) GIT_REV=$(GIT_REV)
+	# For fan2go, its Makefile seems to determine these internally or via env vars.
+	# The fan2go Makefile uses VERSION?=0.10.0, GIT_REV, DATE, etc.
+	# We can let it use its defaults or try to override them if our package versioning dictates.
+	# For now, let it use its internal logic for version embedding.
+	$(MAKE) -C $(UPSTREAM_SRC_DIR) clean # Clean upstream first
+	$(MAKE) -C $(UPSTREAM_SRC_DIR) build
+
+# Override the install step:
+# 1. Manually copy the binary built by upstream's Makefile to our staging area.
+# 2. Then, let dh_auto_install handle other installations (like config files via .install).
+override_dh_auto_install:
+	# Create the target directory in the package staging area (e.g., debian/fan2go/usr/bin)
+	mkdir -p $(CURDIR)/debian/fan2go/usr/bin
+	
+	# Copy the compiled binary from where upstream's Makefile placed it
+	# (UPSTREAM_SRC_DIR/bin/fan2go) to the staging directory.
+	cp $(UPSTREAM_SRC_DIR)/bin/fan2go $(CURDIR)/debian/fan2go/usr/bin/fan2go
+	
+	# Now run the standard dh_auto_install to process debian/*.install files,
+	# create directories, etc. It should pick up the binary we just placed
+	# if 'usr/bin/fan2go' is in debian/fan2go.install.
+	dh_auto_install
+
+# If dh_golang tries to build/install on its own and conflicts,
+# we might need to further refine which parts of dh_golang sequence are used.
+# For example, by using specific dh_golang_ Runc Bumps instead of --with golang.
+# Or by ensuring dh_golang_build_binary and dh_golang_install_binary are no-ops.
+# For now, this approach of overriding dh_auto_build and dh_auto_install
+# while keeping --with golang is a common way to integrate external Makefiles.
