@@ -26,6 +26,17 @@ override_dh_auto_build:
 	go mod download
 	$(MAKE) build
 
+# Override dh_auto_test to run tests and report status explicitly (temporary for diagnostics)
+override_dh_auto_test:
+	@echo "Running tests via override_dh_auto_test (temporary for diagnostics)..."
+	if $(MAKE) test; then \
+	    echo "INFO: Tests passed with exit code 0."; \
+	else \
+	    TEST_EXIT_CODE=$$?; \
+	    echo "ERROR: Tests failed with exit code $${TEST_EXIT_CODE}. See output above for details."; \
+	    exit $${TEST_EXIT_CODE}; \
+	fi
+
 # Override the install step:
 # 1. Manually copy the binary built by upstream's Makefile to our staging area.
 # 2. Then, let dh_auto_install handle other installations (like config files via .install).
