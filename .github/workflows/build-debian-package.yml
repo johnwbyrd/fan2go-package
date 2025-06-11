@@ -77,6 +77,7 @@ jobs:
         shell: bash
       
       - name: Update changelog for continuous build
+        id: changelog_update_step # Add an ID to this step
         # This step runs on pushes to main (or your primary branch)
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         env:
@@ -89,17 +90,18 @@ jobs:
           BUILD_TIMESTAMP=$(date +%Y%m%d%H%M%S)
           
           # Construct version: <upstream_version>-<debian_revision>+git<timestamp>.<packaging_sha>~<dist>1
-          FULL_DEB_VERSION="${UPSTREAM_VERSION_NUM}-${{ env.DEBIAN_REVISION }}+git${BUILD_TIMESTAMP}.${PACKAGING_SHA_SHORT}"
+          FULL_DEB_VERSION_BASE="${UPSTREAM_VERSION_NUM}-${{ env.DEBIAN_REVISION }}+git${BUILD_TIMESTAMP}.${PACKAGING_SHA_SHORT}"
+          FULL_DEB_VERSION_WITH_DIST="${FULL_DEB_VERSION_BASE}~${{ matrix.dist }}1"
           
           echo "Upstream base version: ${UPSTREAM_VERSION_NUM}"
           echo "Packaging SHA: ${PACKAGING_SHA_SHORT}"
           echo "Timestamp: ${BUILD_TIMESTAMP}"
-          echo "Calculated Full Debian version for changelog: ${FULL_DEB_VERSION}~${{ matrix.dist }}1"
+          echo "Calculated Full Debian version for changelog: ${FULL_DEB_VERSION_WITH_DIST}"
           
           cd fan2go-package/_upstream_src
           
           # Add the new version entry
-          dch --newversion "${FULL_DEB_VERSION}~${{ matrix.dist }}1" \
+          dch --newversion "${FULL_DEB_VERSION_WITH_DIST}" \
             --distribution "unstable" \
             "Automated continuous build from packaging commit ${PACKAGING_SHA_SHORT} (tracks upstream ${{ env.UPSTREAM_STABLE_VERSION }})."
           
@@ -108,9 +110,15 @@ jobs:
           
           echo "Updated changelog content:"
           cat debian/changelog
+          
+          # Output the version string for help2man (without ~dist suffix, as help2man version usually doesn't include it)
+          echo "deb_package_version=${FULL_DEB_VERSION_BASE}" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Build the Debian package
+        env:
+          # Make the package version available to debian/rules for help2man
+          DEB_PACKAGE_VERSION: ${{ steps.changelog_update_step.outputs.deb_package_version }}
         run: |
           cd fan2go-package/_upstream_src # dpkg-buildpackage runs from the source root
           # -us -uc: don't sign source and changes (signing .deb happens later if needed for repo)

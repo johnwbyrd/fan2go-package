@@ -30,7 +30,12 @@ override_dh_auto_build:
 	$(MAKE) build GO_FLAGS="-buildmode=pie"
 	# Generate man page from the built binary
 	# The output is placed in debian/ so dh_installman can find it.
-	help2man --name="fan2go - Fan control daemon" --no-info --output=$(CURDIR)/debian/fan2go.1 $(CURDIR)/bin/fan2go
+	# DEB_PACKAGE_VERSION should be set in the environment by the CI workflow.
+	help2man --name="fan2go - Fan control daemon" \
+	         --no-info \
+	         --version-string="$${DEB_PACKAGE_VERSION:-unknown}" \
+	         --output=$(CURDIR)/debian/fan2go.1 \
+	         $(CURDIR)/bin/fan2go
 
 # Override dh_auto_test to run tests, show tail of log, and report status
 override_dh_auto_test:
