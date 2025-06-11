@@ -10,7 +10,10 @@ export GOPROXY=https://proxy.golang.org,direct
 # upstream source tree where the debian/ directory has been copied.
 # Thus, all Makefile commands here operate relative to that root.
 %:
-	dh $@ --with golang
+	dh $@
+	# Note: --with golang removed. We handle Go build/install steps manually
+	# via overrides, and the Go toolchain is from the container, not Debian packages.
+	# This should prevent dh_golang from making problematic assumptions.
 
 # Override dh_auto_clean to call upstream's clean target but ignore errors.
 override_dh_auto_clean:
