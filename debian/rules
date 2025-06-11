@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 export DH_VERBOSE=1
-export GO111MODULE=on # Ensure Go modules are enabled for all Go operations
+export GO111MODULE=auto
 
 # Standard debhelper sequence with Go support.
 # dpkg-buildpackage will be invoked from the root of the actual
