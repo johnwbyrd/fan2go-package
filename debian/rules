@@ -27,7 +27,10 @@ override_dh_auto_build:
 	# These commands are run in the current directory, which is the upstream source root.
 	go mod tidy
 	go mod download
-	$(MAKE) build
+	$(MAKE) build GO_FLAGS="-buildmode=pie"
+	# Generate man page from the built binary
+	# The output is placed in debian/ so dh_installman can find it.
+	help2man --name="fan2go - Fan control daemon" --no-info --output=$(CURDIR)/debian/fan2go.1 $(CURDIR)/bin/fan2go
 
 # Override dh_auto_test to run tests, show tail of log, and report status
 override_dh_auto_test:
@@ -52,4 +55,3 @@ override_dh_auto_test:
 	if [ $${_TEST_EXIT_CODE} -ne 0 ]; then \
 	    exit $${_TEST_EXIT_CODE}; \
 	fi
-

@@ -63,7 +63,8 @@ jobs:
             lintian \
             git \
             ca-certificates \
-            libsensors-dev
+            libsensors-dev \
+            help2man
           # Note: Go (golang-*) is provided by the base container image (e.g., golang:1.23.1-bookworm)
           # and was therefore removed from the apt-get install list above.
         shell: bash
@@ -99,11 +100,11 @@ jobs:
           
           # Add the new version entry
           dch --newversion "${FULL_DEB_VERSION}~${{ matrix.dist }}1" \
-            --distribution "${{ matrix.dist }}" \
+            --distribution "unstable" \
             "Automated continuous build from packaging commit ${PACKAGING_SHA_SHORT} (tracks upstream ${{ env.UPSTREAM_STABLE_VERSION }})."
           
           # Finalize this new version entry (marks it as released for this distribution)
-          dch --release --distribution "${{ matrix.dist }}" "" 
+          dch --release --distribution "unstable" "" 
           
           echo "Updated changelog content:"
           cat debian/changelog
