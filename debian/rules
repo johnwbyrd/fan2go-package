@@ -53,8 +53,3 @@ override_dh_auto_test:
 	    exit $${_TEST_EXIT_CODE}; \
 	fi
 
-# No longer overriding dh_auto_install.
-# The upstream Makefile does not have an 'install' target.
-# The files (binary and config) are now correctly specified in debian/fan2go.install
-# such that the standard 'dh_install' (called during 'dh binary') will pick them up
-# from their build locations (e.g., 'bin/fan2go' from source root, 'debian/fan2go.yaml').

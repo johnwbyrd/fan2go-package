@@ -1,12 +1,3 @@
-# Install the fan2go binary
-# Assuming the binary is built by 'go build' and is named 'fan2go'
-# dh_golang usually places this in a temporary install dir like debian/fan2go/usr/go/bin/
-# Or, if the go project installs to $GOBIN, it might be $GOBIN/fan2go.
-# We need to ensure it's taken from the correct build location.
-# For now, let's assume dh_golang puts it where dh_install can find it relative to the package root.
-# If the binary is built in the root of the project as 'fan2go':
-# fan2go usr/bin
-
 # Install the compiled binary from 'bin/fan2go' (relative to source root)
 # into '/usr/bin' in the package.
 bin/fan2go usr/bin
