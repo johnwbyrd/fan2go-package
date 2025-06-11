@@ -69,7 +69,8 @@ jobs:
             devscripts \
             lintian \
             git \
-            ca-certificates
+            ca-certificates \
+            libsensors-dev
           # Note: Go (golang-*) is provided by the base container image (e.g., golang:1.23.1-bookworm)
           # and was therefore removed from the apt-get install list above.
         shell: bash

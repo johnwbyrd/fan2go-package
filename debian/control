@@ -3,7 +3,8 @@ Section: utils
 Priority: optional
 Maintainer: John Byrd <johnwbyrd@gmail.com>
 Build-Depends: debhelper-compat (= 13),
-               dh-golang
+               dh-golang,
+               libsensors-dev
 Standards-Version: 4.6.2
 Vcs-Git: https://www.github.com/johnwbyrd/fan2go-package.git
 Vcs-Browser: https://www.github.com/johnwbyrd/fan2go-package
