@@ -54,9 +54,11 @@ case "$1" in
 
 
         # Reload udev rules
-        if [ -x /sbin/udevadm ]; then
+        if command -v udevadm >/dev/null 2>&1; then
             udevadm control --reload-rules || true
             udevadm trigger --subsystem-match=hwmon || true
+        else
+            echo "WARNING: udevadm command not found, cannot reload udev rules." >&2
         fi
 
         # Reload systemd manager configuration and restart service

@@ -1,6 +1,6 @@
 [Unit]
 Description=fan2go system fan controller
-After=network.target syslog.target lm_sensors.service
+After=network.target lm_sensors.service
 Wants=lm_sensors.service
 
 [Service]

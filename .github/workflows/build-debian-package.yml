@@ -78,6 +78,9 @@ jobs:
       - name: Update changelog for continuous build
         # This step runs on pushes to main (or your primary branch)
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        env:
+          DEBEMAIL: "johnwbyrd@gmail.com"
+          DEBFULLNAME: "John Byrd"
         run: |
           echo "Updating changelog for continuous build..."
           UPSTREAM_VERSION_NUM=$(echo "${{ env.UPSTREAM_STABLE_VERSION }}" | sed 's/^v//')
