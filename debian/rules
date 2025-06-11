@@ -1,6 +1,7 @@
 #!/usr/bin/make -f
 
 export DH_VERBOSE=1
+export GO111MODULE=on # Ensure Go modules are enabled for all Go operations
 
 # Standard debhelper sequence with Go support.
 # dpkg-buildpackage will be invoked from the root of the actual
@@ -12,6 +13,7 @@ export DH_VERBOSE=1
 # Override dh_auto_clean to call upstream's clean target but ignore errors.
 override_dh_auto_clean:
 	@echo "Running overridden dh_auto_clean to clean upstream..."
+	# GO111MODULE=on is inherited from the export at the top of the file
 	-$(MAKE) clean
 
 # Override the build step to use upstream's Makefile.
@@ -19,6 +21,7 @@ override_dh_auto_build:
 	@echo "Running overridden dh_auto_build to build upstream..."
 	# Ensure Go modules are downloaded and tidy before building.
 	# These commands are run in the current directory, which is the upstream source root.
+	# GO111MODULE=on is inherited.
 	go mod tidy
 	go mod download
 	$(MAKE) build
