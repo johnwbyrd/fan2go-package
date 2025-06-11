@@ -117,12 +117,13 @@ jobs:
       - name: Upload Debian package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: fan2go-${{ matrix.dist }}-${{ matrix.arch }}-${{ github.ref_name }}
+          name: fan2go-build-artifacts-${{ matrix.dist }}-${{ matrix.arch }}-${{ github.ref_name }} # More generic name
           path: |
             fan2go-package/*.deb
             fan2go-package/*.changes
             fan2go-package/*.buildinfo
-            # Add lintian log if generated to a file
+            fan2go-package/test_output_*.log # Upload the test log
+            # Add lintian log if generated to a file, e.g. fan2go-package/lintian.log
           retention-days: 7
 
       - name: Create GitHub Release and Upload Assets

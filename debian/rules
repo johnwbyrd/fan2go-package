@@ -26,22 +26,27 @@ override_dh_auto_build:
 	go mod download
 	$(MAKE) build
 
-# Override dh_auto_test to run tests and report status explicitly (temporary for diagnostics)
+# Override dh_auto_test to run tests, show tail of log, and report status
 override_dh_auto_test:
-	@echo "Running tests via override_dh_auto_test (temporary for diagnostics)..."
-	@echo "Attempting to run tests with NO_COLOR=1 and capturing output to test_output.log"
-	# Try to disable colors and redirect all output to a file
-	if NO_COLOR=1 $(MAKE) test > test_output.log 2>&1; then \
-	    echo "INFO: Tests completed with exit code 0 (presumed pass)."; \
-	    echo "-------------------- Full Test Output Start --------------------"; \
-	    cat test_output.log || echo "INFO: test_output.log not found or unreadable."; \
-	    echo "-------------------- Full Test Output End ----------------------"; \
+	@echo "Running tests via override_dh_auto_test (capturing to test_output.log)..."
+	# Run tests, redirecting output. Allow command to fail to capture exit code.
+	NO_COLOR=1 $(MAKE) test > test_output.log 2>&1 || true
+	TEST_EXIT_CODE=$$?
+
+	@echo "-------------------- Last 100 lines of Test Output (test_output.log) --------------------"
+	@tail -n 100 test_output.log || echo "INFO: test_output.log not found or unreadable."
+	@echo "---------------------------------- End of Test Output Snippet -----------------------------------"
+
+	# Move the full log for artifact upload before potentially exiting.
+	# The filename includes dist and arch for clarity if multiple are built.
+	# dpkg-parsechangelog and dpkg-architecture need devscripts to be installed.
+	@mv test_output.log $(CURDIR)/../test_output_`dpkg-parsechangelog -S Distribution || echo unknown`_`dpkg-architecture -qDEB_HOST_ARCH || echo unknown`.log || \
+		echo "WARNING: Could not move test_output.log for artifact upload."
+
+	if [ $${TEST_EXIT_CODE} -eq 0 ]; then \
+	    echo "INFO: Tests completed successfully (exit code 0)."; \
 	else \
-	    TEST_EXIT_CODE=$$?; \
-	    echo "ERROR: Tests completed with exit code $${TEST_EXIT_CODE}."; \
-	    echo "-------------------- Full Test Output Start --------------------"; \
-	    cat test_output.log || echo "INFO: test_output.log not found or unreadable."; \
-	    echo "-------------------- Full Test Output End ----------------------"; \
+	    echo "ERROR: Tests failed with exit code $${TEST_EXIT_CODE}. Full log available as an artifact."; \
 	    exit $${TEST_EXIT_CODE}; \
 	fi
 
