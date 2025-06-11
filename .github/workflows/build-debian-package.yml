@@ -66,11 +66,12 @@ jobs:
             build-essential \
             debhelper \
             dh-golang \
-            # golang is now provided by the base container image
             devscripts \
             lintian \
             git \
             ca-certificates
+          # Note: Go (golang-*) is provided by the base container image (e.g., golang:1.23.1-bookworm)
+          # and was therefore removed from the apt-get install list above.
         shell: bash
 
       - name: Prepare packaging files
