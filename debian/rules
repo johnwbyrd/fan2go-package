@@ -28,7 +28,7 @@ override_dh_auto_build:
 	# The fan2go Makefile uses VERSION?=0.10.0, GIT_REV, DATE, etc.
 	# We can let it use its defaults or try to override them if our package versioning dictates.
 	# For now, let it use its internal logic for version embedding.
-	$(MAKE) -C $(UPSTREAM_SRC_DIR) clean # Clean upstream first
+	-$(MAKE) -C $(UPSTREAM_SRC_DIR) clean # Clean upstream first, ignore errors from this specific command
 	$(MAKE) -C $(UPSTREAM_SRC_DIR) build
 
 # Override the install step:
