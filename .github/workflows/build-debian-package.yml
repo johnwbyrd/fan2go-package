@@ -3,18 +3,20 @@ name: Build Debian Package
 on:
   push:
     branches:
-      - main
-      - master
-    tags:
-      - 'v*.*.*'
+      - main # Or your primary branch name
+      # - master # Remove if 'main' is your only primary branch
   pull_request:
     branches:
-      - main
-      - master
+      - main # Or your primary branch name
+      # - master
 
 jobs:
   build:
     runs-on: ubuntu-latest # We'll use Docker for the actual Debian environment
+    env:
+      UPSTREAM_STABLE_VERSION: "v0.10.0" # Define the target upstream version here
+      DEBIAN_REVISION: "1"             # Your packaging revision for this upstream version
+      CONTINUOUS_RELEASE_TAG: "latest-main-build" # Fixed tag for continuous releases
 
     strategy:
       matrix:
@@ -32,23 +34,11 @@ jobs:
         with:
           path: fan2go-package # Checkout this packaging repo
 
-      - name: Determine Upstream fan2go Version/Tag
+      - name: Set Upstream Version
         id: upstream_version
         run: |
-          # Default to 'master' branch of upstream for non-tag pushes
-          UPSTREAM_REF="master"
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
-            # For tagged pushes on this repo, assume the same tag exists upstream
-            UPSTREAM_REF="${{ github.ref_name }}"
-            echo "Using upstream tag: $UPSTREAM_REF based on this repo's tag."
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            # For PRs, you might want to build against upstream master or a specific PR branch
-            # For simplicity, using master for PRs now.
-            echo "Building PR against upstream master."
-          else
-            echo "Building non-tag push against upstream master."
-          fi
-          echo "UPSTREAM_REF=${UPSTREAM_REF}" >> $GITHUB_OUTPUT
+          echo "UPSTREAM_REF=${{ env.UPSTREAM_STABLE_VERSION }}" >> $GITHUB_OUTPUT
+          echo "Packaging fixed upstream version: ${{ env.UPSTREAM_STABLE_VERSION }}"
         shell: bash
 
       - name: Checkout upstream fan2go source
@@ -82,15 +72,34 @@ jobs:
           cp -r fan2go-package/debian fan2go-package/_upstream_src/
         shell: bash
       
-      - name: Update changelog for release builds (optional)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Update changelog for continuous build
+        # This step runs on pushes to main (or your primary branch)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: |
+          echo "Updating changelog for continuous build..."
+          UPSTREAM_VERSION_NUM=$(echo "${{ env.UPSTREAM_STABLE_VERSION }}" | sed 's/^v//')
+          PACKAGING_SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          BUILD_TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          
+          # Construct version: <upstream_version>-<debian_revision>+git<timestamp>.<packaging_sha>~<dist>1
+          FULL_DEB_VERSION="${UPSTREAM_VERSION_NUM}-${{ env.DEBIAN_REVISION }}+git${BUILD_TIMESTAMP}.${PACKAGING_SHA_SHORT}"
+          
+          echo "Upstream base version: ${UPSTREAM_VERSION_NUM}"
+          echo "Packaging SHA: ${PACKAGING_SHA_SHORT}"
+          echo "Timestamp: ${BUILD_TIMESTAMP}"
+          echo "Calculated Full Debian version for changelog: ${FULL_DEB_VERSION}~${{ matrix.dist }}1"
+          
           cd fan2go-package/_upstream_src
-          # Extract version from tag (e.g., v0.1.0 -> 0.1.0)
-          DEB_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
-          # Use dch to add a new entry. Adjust distribution as needed.
-          dch --newversion "${DEB_VERSION}-1~${{ matrix.dist }}1" --distribution "${{ matrix.dist }}" "New upstream release ${DEB_VERSION}."
-          dch --release "" # Close the entry
+          
+          # Add the new version entry
+          dch --newversion "${FULL_DEB_VERSION}~${{ matrix.dist }}1" \
+            --distribution "${{ matrix.dist }}" \
+            "Automated continuous build from packaging commit ${PACKAGING_SHA_SHORT} (tracks upstream ${{ env.UPSTREAM_STABLE_VERSION }})."
+          
+          # Finalize this new version entry (marks it as released for this distribution)
+          dch --release --distribution "${{ matrix.dist }}" "" 
+          
+          echo "Updated changelog content:"
           cat debian/changelog
         shell: bash
 
@@ -126,13 +135,18 @@ jobs:
             # Add lintian log if generated to a file, e.g. fan2go-package/lintian.log
           retention-days: 7
 
-      - name: Create GitHub Release and Upload Assets
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Create/Update Continuous GitHub Release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         uses: softprops/action-gh-release@v2
         with:
-          # body_path: fan2go-package/_upstream_src/debian/changelog # Or generate release notes
+          tag_name: ${{ env.CONTINUOUS_RELEASE_TAG }}
+          name: "Continuous Build (fan2go ${{ env.UPSTREAM_STABLE_VERSION }} - pkg commit ${{ github.sha }})"
+          body: "Automated continuous build from ${{ github.ref_name }} branch, packaging commit ${{ github.sha }}. Based on upstream fan2go version ${{ env.UPSTREAM_STABLE_VERSION }}."
+          prerelease: true
+          # make_latest: true # Optional: set to true to mark this as the "latest" release on GitHub UI
           files: |
             fan2go-package/*.deb
             fan2go-package/*.changes
+            fan2go-package/test_output_*.log # Optional: also upload the full test log to the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
