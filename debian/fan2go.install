@@ -7,13 +7,9 @@
 # If the binary is built in the root of the project as 'fan2go':
 # fan2go usr/bin
 
-# A more robust way, assuming dh_golang correctly installs it into the package's staging area:
-# This path might need adjustment depending on how debian/rules stages the binary.
-# If debian/rules places the compiled binary directly into debian/fan2go/usr/bin/fan2go,
-# then this line might not even be needed, or it would be just 'usr/bin/fan2go'.
-# This line tells dh_install to look for 'debian/fan2go/usr/bin/fan2go' and install it.
-# The destination /usr/bin/ is implicit.
-usr/bin/fan2go
+# Install the compiled binary from 'bin/fan2go' (relative to source root)
+# into '/usr/bin' in the package.
+bin/fan2go usr/bin
 
 # Install our default Debian configuration file
 # This takes debian/fan2go.yaml from our packaging files and installs it

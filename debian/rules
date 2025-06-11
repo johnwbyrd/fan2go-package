@@ -29,39 +29,29 @@ override_dh_auto_build:
 # Override dh_auto_test to run tests, show tail of log, and report status
 override_dh_auto_test:
 	@echo "Running tests via override_dh_auto_test (capturing to test_output.log)..."
-	# Run tests, redirecting output. Allow command to fail to capture exit code.
-	NO_COLOR=1 $(MAKE) test > test_output.log 2>&1 || true
-	TEST_EXIT_CODE=$$?
-
-	@echo "-------------------- Last 100 lines of Test Output (test_output.log) --------------------"
-	@tail -n 100 test_output.log || echo "INFO: test_output.log not found or unreadable."
-	@echo "---------------------------------- End of Test Output Snippet -----------------------------------"
-
-	# Move the full log for artifact upload before potentially exiting.
-	# The filename includes dist and arch for clarity if multiple are built.
-	# dpkg-parsechangelog and dpkg-architecture need devscripts to be installed.
-	@mv test_output.log $(CURDIR)/../test_output_`dpkg-parsechangelog -S Distribution || echo unknown`_`dpkg-architecture -qDEB_HOST_ARCH || echo unknown`.log || \
-		echo "WARNING: Could not move test_output.log for artifact upload."
-
-	if [ $${TEST_EXIT_CODE} -eq 0 ]; then \
+	# Run tests, redirecting output. The shell 'if' statement will handle the exit code.
+	if NO_COLOR=1 $(MAKE) test > test_output.log 2>&1; then \
+	    _TEST_EXIT_CODE=0; \
 	    echo "INFO: Tests completed successfully (exit code 0)."; \
 	else \
-	    echo "ERROR: Tests failed with exit code $${TEST_EXIT_CODE}. Full log available as an artifact."; \
-	    exit $${TEST_EXIT_CODE}; \
+	    _TEST_EXIT_CODE=$$?; \
+	    echo "ERROR: Tests failed with exit code $${_TEST_EXIT_CODE}."; \
+	fi; \
+	\
+	echo "-------------------- Last 100 lines of Test Output (test_output.log) --------------------"; \
+	tail -n 100 test_output.log || echo "INFO: test_output.log not found or unreadable."; \
+	echo "---------------------------------- End of Test Output Snippet -----------------------------------"; \
+	\
+	echo "INFO: Moving test_output.log for artifact upload..."; \
+	mv test_output.log $(CURDIR)/../test_output_`dpkg-parsechangelog -S Distribution || echo unknown`_`dpkg-architecture -qDEB_HOST_ARCH || echo unknown`.log || \
+		echo "WARNING: Could not move test_output.log for artifact upload."; \
+	\
+	if [ $${_TEST_EXIT_CODE} -ne 0 ]; then \
+	    exit $${_TEST_EXIT_CODE}; \
 	fi
 
-# Override the install step:
-# 1. Manually copy the binary built by upstream's Makefile to our staging area.
-# 2. Then, let dh_auto_install handle other installations (like config files via .install).
-override_dh_auto_install:
-	@echo "Running overridden dh_auto_install..."
-	# Create the target directory in the package staging area (e.g., debian/fan2go/usr/bin)
-	# $(CURDIR) here refers to the root of the source tree where dpkg-buildpackage is running.
-	mkdir -p $(CURDIR)/debian/fan2go/usr/bin
-	
-	# Copy the compiled binary from bin/fan2go (relative to the source tree root)
-	# to the staging directory.
-	cp $(CURDIR)/bin/fan2go $(CURDIR)/debian/fan2go/usr/bin/fan2go
-	
-	# Now run the standard dh_auto_install to process debian/*.install files, etc.
-	dh_auto_install
+# No longer overriding dh_auto_install.
+# The upstream Makefile does not have an 'install' target.
+# The files (binary and config) are now correctly specified in debian/fan2go.install
+# such that the standard 'dh_install' (called during 'dh binary') will pick them up
+# from their build locations (e.g., 'bin/fan2go' from source root, 'debian/fan2go.yaml').
