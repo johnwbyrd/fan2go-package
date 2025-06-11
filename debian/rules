@@ -2,62 +2,35 @@
 
 export DH_VERBOSE=1
 
-# Define the directory where the upstream fan2go source code is located.
-# For local builds, you would need to ensure the fan2go source is cloned/copied here.
-# For GitHub Actions, the workflow would handle checking out the upstream source to this path.
-UPSTREAM_SRC_DIR := $(CURDIR)/_upstream_src
-# Alternatively, if the debian directory is moved into the upstream source tree:
-# UPSTREAM_SRC_DIR := $(CURDIR)/..
-
-# Get package version from changelog for passing to the build, if needed by upstream Makefile
-# VERSION := $(shell dpkg-parsechangelog -S Version | sed 's/-[^-]*$$//')
-# GIT_REV := $(shell dpkg-parsechangelog -S Version | sed 's/^[0-9.]*-//') # Example if git rev is in debian version
-
 # Standard debhelper sequence with Go support.
-# We override specific steps (build, install) to use the upstream Makefile
-# and handle the binary placement.
+# dpkg-buildpackage will be invoked from the root of the actual
+# upstream source tree where the debian/ directory has been copied.
+# Thus, all Makefile commands here operate relative to that root.
 %:
 	dh $@ --with golang
 
 # Override dh_auto_clean to call upstream's clean target but ignore errors.
-# This ensures that the 'debian/rules clean' operation, called by dpkg-buildpackage,
-# correctly handles the upstream clean process.
 override_dh_auto_clean:
 	@echo "Running overridden dh_auto_clean to clean upstream..."
-	-$(MAKE) -C $(UPSTREAM_SRC_DIR) clean
+	-$(MAKE) clean
 
 # Override the build step to use upstream's Makefile.
-# This assumes the upstream Makefile has a 'build' target.
-# The upstream cleaning is now handled by the 'debian/rules clean' target via override_dh_auto_clean.
 override_dh_auto_build:
 	@echo "Running overridden dh_auto_build to build upstream..."
-	# Pass necessary version information if upstream Makefile uses it.
-	# Example: $(MAKE) -C $(UPSTREAM_SRC_DIR) build VERSION=$(VERSION) GIT_REV=$(GIT_REV)
-	# For fan2go, its Makefile seems to determine these internally or via env vars.
-	# The fan2go Makefile uses VERSION?=0.10.0, GIT_REV, DATE, etc.
-	# We can let it use its defaults or try to override them if our package versioning dictates.
-	# For now, let it use its internal logic for version embedding.
-	$(MAKE) -C $(UPSTREAM_SRC_DIR) build
+	$(MAKE) build
 
 # Override the install step:
 # 1. Manually copy the binary built by upstream's Makefile to our staging area.
 # 2. Then, let dh_auto_install handle other installations (like config files via .install).
 override_dh_auto_install:
+	@echo "Running overridden dh_auto_install..."
 	# Create the target directory in the package staging area (e.g., debian/fan2go/usr/bin)
+	# $(CURDIR) here refers to the root of the source tree where dpkg-buildpackage is running.
 	mkdir -p $(CURDIR)/debian/fan2go/usr/bin
 	
-	# Copy the compiled binary from where upstream's Makefile placed it
-	# (UPSTREAM_SRC_DIR/bin/fan2go) to the staging directory.
-	cp $(UPSTREAM_SRC_DIR)/bin/fan2go $(CURDIR)/debian/fan2go/usr/bin/fan2go
+	# Copy the compiled binary from bin/fan2go (relative to the source tree root)
+	# to the staging directory.
+	cp $(CURDIR)/bin/fan2go $(CURDIR)/debian/fan2go/usr/bin/fan2go
 	
-	# Now run the standard dh_auto_install to process debian/*.install files,
-	# create directories, etc. It should pick up the binary we just placed
-	# if 'usr/bin/fan2go' is in debian/fan2go.install.
+	# Now run the standard dh_auto_install to process debian/*.install files, etc.
 	dh_auto_install
-
-# If dh_golang tries to build/install on its own and conflicts,
-# we might need to further refine which parts of dh_golang sequence are used.
-# For example, by using specific dh_golang_ Runc Bumps instead of --with golang.
-# Or by ensuring dh_golang_build_binary and dh_golang_install_binary are no-ops.
-# For now, this approach of overriding dh_auto_build and dh_auto_install
-# while keeping --with golang is a common way to integrate external Makefiles.
