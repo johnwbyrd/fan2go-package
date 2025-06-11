@@ -19,11 +19,12 @@ jobs:
     strategy:
       matrix:
         # For now, only Debian Bookworm. Can expand later.
-        dist: [bookworm]
+        # dist variable is no longer used for container image if we hardcode golang version
+        dist: [bookworm] # Still useful for changelog and artifact naming
         arch: [amd64] # Can expand to arm64 later with QEMU or dedicated runners
 
     container:
-      image: debian:${{ matrix.dist }}
+      image: golang:1.23.1-bookworm # Use specific Go version on Bookworm base
 
     steps:
       - name: Checkout fan2go-package (this repo)
@@ -56,6 +57,7 @@ jobs:
           repository: markusressel/fan2go # The upstream fan2go repository
           ref: ${{ steps.upstream_version.outputs.UPSTREAM_REF }}
           path: fan2go-package/_upstream_src # Checkout into the path expected by debian/rules
+          fetch-depth: 0 # Fetch all history for git commands in Makefile
 
       - name: Install build dependencies
         run: |
@@ -64,7 +66,7 @@ jobs:
             build-essential \
             debhelper \
             dh-golang \
-            golang-go \
+            # golang is now provided by the base container image
             devscripts \
             lintian \
             git \

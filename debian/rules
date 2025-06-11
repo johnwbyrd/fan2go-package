@@ -17,6 +17,10 @@ override_dh_auto_clean:
 # Override the build step to use upstream's Makefile.
 override_dh_auto_build:
 	@echo "Running overridden dh_auto_build to build upstream..."
+	# Ensure Go modules are downloaded and tidy before building.
+	# These commands are run in the current directory, which is the upstream source root.
+	go mod tidy
+	go mod download
 	$(MAKE) build
 
 # Override the install step:
