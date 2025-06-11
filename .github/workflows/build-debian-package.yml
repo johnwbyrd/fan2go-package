@@ -14,7 +14,7 @@ jobs:
   build:
     runs-on: ubuntu-latest # We'll use Docker for the actual Debian environment
     env:
-      UPSTREAM_STABLE_VERSION: "v0.10.0" # Define the target upstream version here
+      UPSTREAM_STABLE_VERSION: "0.10.0" # Define the target upstream version here
       DEBIAN_REVISION: "1"             # Your packaging revision for this upstream version
       CONTINUOUS_RELEASE_TAG: "latest-main-build" # Fixed tag for continuous releases
 
