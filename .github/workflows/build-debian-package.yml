@@ -41,7 +41,7 @@ jobs:
         run: |
           VERSION=$(curl -s https://raw.githubusercontent.com/markusressel/fan2go/refs/heads/master/Makefile | grep -E 'VERSION\s*\?=' | awk '{print $3}')
           echo "UPSTREAM_VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "UPSTREAM_REF=v$VERSION" >> $GITHUB_OUTPUT
+          echo "UPSTREAM_REF=$VERSION" >> $GITHUB_OUTPUT
           echo "Using upstream version: $VERSION"
         shell: bash
 
