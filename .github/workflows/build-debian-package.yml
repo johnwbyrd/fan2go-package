@@ -120,8 +120,10 @@ jobs:
           echo "Updated changelog content:"
           cat debian/changelog
           
-          # Output the version string for help2man (without ~dist suffix, as help2man version usually doesn't include it)
+          # Output variables for later steps
           echo "deb_package_version=${FULL_DEB_VERSION_BASE}" >> $GITHUB_OUTPUT
+          echo "build_timestamp=${BUILD_TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "packaging_sha_short=${PACKAGING_SHA_SHORT}" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Build the Debian package
@@ -164,11 +166,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "${{ steps.changelog_update_step.outputs.deb_package_version }}"
-          name: "fan2go ${{ steps.fetch_upstream_version.outputs.UPSTREAM_VERSION }} (Build ${{ env.BUILD_TIMESTAMP }}-${{ env.PACKAGING_SHA_SHORT }})"
+          name: "fan2go ${{ steps.fetch_upstream_version.outputs.UPSTREAM_VERSION }} (Build ${{ steps.changelog_update_step.outputs.build_timestamp }}-${{ steps.changelog_update_step.outputs.packaging_sha_short }})"
           body: |
             ### Build Details
             - **Debian Version**: ${{ steps.changelog_update_step.outputs.deb_package_version }}
-            - **Build Date**: ${{ env.BUILD_TIMESTAMP }}
+            - **Build Date**: ${{ steps.changelog_update_step.outputs.build_timestamp }}
             - **Packaging Commit**: [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
             - **Upstream Version**: ${{ steps.fetch_upstream_version.outputs.UPSTREAM_VERSION }}
             - **Upstream Commit**: [${{ steps.fetch_upstream_version.outputs.UPSTREAM_SHA }}](https://github.com/markusressel/fan2go/commit/${{ steps.fetch_upstream_version.outputs.UPSTREAM_SHA }})
