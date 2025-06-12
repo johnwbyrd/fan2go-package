@@ -17,7 +17,6 @@ jobs:
   build:
     runs-on: ubuntu-latest # We'll use Docker for the actual Debian environment
     env:
-      UPSTREAM_STABLE_VERSION: "0.10.0" # Define the target upstream version here
       DEBIAN_REVISION: "1"             # Your packaging revision for this upstream version
       CONTINUOUS_RELEASE_TAG: "latest-main-build" # Fixed tag for continuous releases
 
@@ -37,20 +36,22 @@ jobs:
         with:
           path: fan2go-package # Checkout this packaging repo
 
-      - name: Set Upstream Version
-        id: upstream_version
+      - name: Fetch upstream version
+        id: fetch_upstream_version
         run: |
-          echo "UPSTREAM_REF=${{ env.UPSTREAM_STABLE_VERSION }}" >> $GITHUB_OUTPUT
-          echo "Packaging fixed upstream version: ${{ env.UPSTREAM_STABLE_VERSION }}"
+          VERSION=$(curl -s https://raw.githubusercontent.com/markusressel/fan2go/refs/heads/master/Makefile | grep -E 'VERSION\s*\?=' | awk '{print $3}')
+          echo "UPSTREAM_VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "UPSTREAM_REF=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Using upstream version: $VERSION"
         shell: bash
 
       - name: Checkout upstream fan2go source
         uses: actions/checkout@v4
         with:
-          repository: markusressel/fan2go # The upstream fan2go repository
-          ref: ${{ steps.upstream_version.outputs.UPSTREAM_REF }}
-          path: fan2go-package/_upstream_src # Checkout into the path expected by debian/rules
-          fetch-depth: 0 # Fetch all history for git commands in Makefile
+          repository: markusressel/fan2go
+          ref: ${{ steps.fetch_upstream_version.outputs.UPSTREAM_REF }}
+          path: fan2go-package/_upstream_src
+          fetch-depth: 0
 
       - name: Install build dependencies
         run: |
@@ -85,7 +86,7 @@ jobs:
           DEBFULLNAME: "John Byrd"
         run: |
           echo "Updating changelog for continuous build..."
-          UPSTREAM_VERSION_NUM=$(echo "${{ env.UPSTREAM_STABLE_VERSION }}" | sed 's/^v//')
+          UPSTREAM_VERSION_NUM=${{ steps.fetch_upstream_version.outputs.UPSTREAM_VERSION }}
           PACKAGING_SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
           BUILD_TIMESTAMP=$(date +%Y%m%d%H%M%S)
           
@@ -150,19 +151,25 @@ jobs:
             # Add lintian log if generated to a file, e.g. fan2go-package/lintian.log
           retention-days: 7
 
-      - name: Create/Update Continuous GitHub Release
+      - name: Create GitHub Release
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.CONTINUOUS_RELEASE_TAG }}
-          name: "Continuous Build (fan2go ${{ env.UPSTREAM_STABLE_VERSION }} - pkg commit ${{ github.sha }})"
-          body: "Automated continuous build from ${{ github.ref_name }} branch, packaging commit ${{ github.sha }}. Based on upstream fan2go version ${{ env.UPSTREAM_STABLE_VERSION }}."
+          tag_name: "${{ steps.changelog_update_step.outputs.deb_package_version }}"
+          name: "fan2go ${{ steps.fetch_upstream_version.outputs.UPSTREAM_VERSION }}"
+          body: |
+            ### Build Details
+            - **Debian Version**: ${{ steps.changelog_update_step.outputs.deb_package_version }}
+            - **Build Date**: ${{ env.BUILD_TIMESTAMP }}
+            - **Packaging Commit**: [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+            - **Upstream Version**: ${{ steps.fetch_upstream_version.outputs.UPSTREAM_VERSION }}
+            - **Distribution**: ${{ matrix.dist }}
+            - **Architecture**: ${{ matrix.arch }}
           prerelease: true
-          # make_latest: true # Optional: set to true to mark this as the "latest" release on GitHub UI
+          make_latest: true
           files: |
             fan2go-package/*.deb
             fan2go-package/*.changes
-            fan2go-package/test_output_*.log 
-            # The above line includes the full test log in the release assets.
+            fan2go-package/test_output_*.log
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -21,45 +21,19 @@ FAN2GO_LOG_DIR="/var/log/fan2go"
 
 case "$1" in
     configure)
-        # Create the fan2go group if it doesn't exist
-        if ! getent group "$FAN2GO_GROUP" >/dev/null; then
-            addgroup --system "$FAN2GO_GROUP" --quiet
-        fi
-
-        # Create the fan2go user if it doesn't exist
-        if ! getent passwd "$FAN2GO_USER" >/dev/null; then
-            adduser \
-                --system \
-                --disabled-login \
-                --ingroup "$FAN2GO_GROUP" \
-                --home "$FAN2GO_HOME" \
-                --no-create-home \
-                --shell /usr/sbin/nologin \
-                "$FAN2GO_USER"
-        fi
-
-        # Create home directory for fan2go if it doesn't exist and set permissions
+        # Create and secure directories for root ownership
         if [ ! -d "$FAN2GO_HOME" ]; then
             mkdir -p "$FAN2GO_HOME"
-            chown "$FAN2GO_USER":"$FAN2GO_GROUP" "$FAN2GO_HOME"
-            chmod 750 "$FAN2GO_HOME"
         fi
+        chown root:root "$FAN2GO_HOME"
+        chmod 700 "$FAN2GO_HOME"
         
-        # Create log directory for fan2go if it doesn't exist and set permissions
         if [ ! -d "$FAN2GO_LOG_DIR" ]; then
             mkdir -p "$FAN2GO_LOG_DIR"
         fi
-        chown "$FAN2GO_USER":"$FAN2GO_GROUP" "$FAN2GO_LOG_DIR"
-        chmod 750 "$FAN2GO_LOG_DIR"
+        chown root:root "$FAN2GO_LOG_DIR"
+        chmod 700 "$FAN2GO_LOG_DIR"
 
-
-        # Reload udev rules
-        if command -v udevadm >/dev/null 2>&1; then
-            udevadm control --reload-rules || true
-            udevadm trigger --subsystem-match=hwmon || true
-        else
-            echo "WARNING: udevadm command not found, cannot reload udev rules." >&2
-        fi
 
         # Reload systemd manager configuration and restart service
         if [ -d /run/systemd/system ]; then

@@ -22,25 +22,12 @@ FAN2GO_LOG_DIR="/var/log/fan2go"
 
 case "$1" in
     purge)
-        # Remove the fan2go user and group if they exist
-        if getent passwd "$FAN2GO_USER" >/dev/null; then
-            deluser --quiet "$FAN2GO_USER" || true # Ignore error if user is logged in (should not happen for system user)
-        fi
-        if getent group "$FAN2GO_GROUP" >/dev/null; then
-            delgroup --quiet "$FAN2GO_GROUP" || true # Ignore error if group is not empty (should not happen if user removed)
-        fi
-
         # Remove home and log directories
         if [ -d "$FAN2GO_HOME" ]; then
             rm -rf "$FAN2GO_HOME"
         fi
         if [ -d "$FAN2GO_LOG_DIR" ]; then
             rm -rf "$FAN2GO_LOG_DIR"
-        fi
-        
-        # Reload systemd manager configuration
-        if [ -d /run/systemd/system ]; then
-            systemctl daemon-reload || true
         fi
     ;;
 

@@ -15,11 +15,10 @@ Package: fan2go
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends},
          lm-sensors,
-         systemd,
-         adduser
+         systemd
 Description: Fan control daemon based on lm-sensors
  fan2go is a utility to control system fans based on temperature readings
- from lm-sensors. It provides configurable fan curves and can run as a
+ from lm-sensors. It provides configurable fan curves and runs as a
  systemd service.
  .
  This package provides:
@@ -27,6 +26,3 @@ Description: Fan control daemon based on lm-sensors
   * A default configuration file at /etc/fan2go/fan2go.yaml, pre-configured
     to use /var/lib/fan2go/fan2go.db for its database.
   * A systemd service unit (fan2go.service) for managing the daemon.
-  * udev rules to grant necessary hardware access to a dedicated 'fan2go' user.
-  * Creation of the 'fan2go' system user and group, with a home directory
-    at /var/lib/fan2go for runtime data.
