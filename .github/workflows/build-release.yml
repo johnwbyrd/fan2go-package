@@ -31,6 +31,9 @@ jobs:
           # Install build tools
           apt install -y git-buildpackage devscripts
           
+      - name: Change to repository directory
+        run: cd fan2go-package
+        
       - name: Import upstream source
         run: gbp import-orig --uscan --pristine-tar
         
