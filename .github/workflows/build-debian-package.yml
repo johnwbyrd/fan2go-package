@@ -40,9 +40,17 @@ jobs:
         id: fetch_upstream_version
         run: |
           VERSION=$(curl -s https://raw.githubusercontent.com/markusressel/fan2go/refs/heads/master/Makefile | grep -E 'VERSION\s*\?=' | awk '{print $3}')
+          
+          # Fetch upstream SHA - first try tag without 'v', then with 'v'
+          UPSTREAM_SHA=$(git ls-remote https://github.com/markusressel/fan2go refs/tags/$VERSION | awk '{print $1}')
+          if [ -z "$UPSTREAM_SHA" ]; then
+            UPSTREAM_SHA=$(git ls-remote https://github.com/markusressel/fan2go refs/tags/v$VERSION | awk '{print $1}')
+          fi
+          
           echo "UPSTREAM_VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "UPSTREAM_SHA=$UPSTREAM_SHA" >> $GITHUB_OUTPUT
           echo "UPSTREAM_REF=$VERSION" >> $GITHUB_OUTPUT
-          echo "Using upstream version: $VERSION"
+          echo "Using upstream version: $VERSION (SHA: $UPSTREAM_SHA)"
         shell: bash
 
       - name: Checkout upstream fan2go source
@@ -156,13 +164,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "${{ steps.changelog_update_step.outputs.deb_package_version }}"
-          name: "fan2go ${{ steps.fetch_upstream_version.outputs.UPSTREAM_VERSION }}"
+          name: "fan2go ${{ steps.fetch_upstream_version.outputs.UPSTREAM_VERSION }} (Build ${{ env.BUILD_TIMESTAMP }}-${{ env.PACKAGING_SHA_SHORT }})"
           body: |
             ### Build Details
             - **Debian Version**: ${{ steps.changelog_update_step.outputs.deb_package_version }}
             - **Build Date**: ${{ env.BUILD_TIMESTAMP }}
             - **Packaging Commit**: [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
             - **Upstream Version**: ${{ steps.fetch_upstream_version.outputs.UPSTREAM_VERSION }}
+            - **Upstream Commit**: [${{ steps.fetch_upstream_version.outputs.UPSTREAM_SHA }}](https://github.com/markusressel/fan2go/commit/${{ steps.fetch_upstream_version.outputs.UPSTREAM_SHA }})
             - **Distribution**: ${{ matrix.dist }}
             - **Architecture**: ${{ matrix.arch }}
           prerelease: true
@@ -170,6 +179,7 @@ jobs:
           files: |
             fan2go-package/*.deb
             fan2go-package/*.changes
+            fan2go-package/*.buildinfo
             fan2go-package/test_output_*.log
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
