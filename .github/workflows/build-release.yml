@@ -24,8 +24,8 @@ jobs:
           echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list.d/backports.list
           apt update
           
-          # Install specific Go version
-          apt install -y -t bookworm-backports golang-1.23=1.23.1-1~bpo12+1
+          # Install latest Go 1.23 from backports
+          apt install -y -t bookworm-backports golang-1.23
           ln -s /usr/lib/go-1.23/bin/go /usr/local/bin/go
           
           # Install build tools
