@@ -1,8 +1,5 @@
-# Install the compiled binary from 'bin/fan2go' (relative to source root)
-# into '/usr/bin' in the package.
+# Install the compiled binary
 bin/fan2go usr/bin
 
-# Install our default Debian configuration file
-# This takes debian/fan2go.yaml from our packaging files and installs it
-# as /etc/fan2go/fan2go.yaml in the final package.
+# Install default configuration
 debian/fan2go.yaml etc/fan2go/

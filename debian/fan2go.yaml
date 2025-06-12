@@ -4,8 +4,7 @@
 # upstream fan2go documentation or the example config from the upstream project.
 
 # Path to the fan2go database file.
-# The fan2go user (service runs as 'fan2go') must have write access to this location.
-# The /var/lib/fan2go directory is created by the package installer with correct permissions.
+# The service runs as root and has write access to this location.
 dbPath: /var/lib/fan2go/fan2go.db
 
 # Log level: "trace", "debug", "info", "warn", "error", "fatal", "panic"

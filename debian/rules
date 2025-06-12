@@ -1,62 +1,8 @@
 #!/usr/bin/make -f
 
-export DH_VERBOSE=1
-export GO111MODULE=auto
-# Allow Go to download modules
-export GOPROXY=https://proxy.golang.org,direct 
-
-# Standard debhelper sequence with Go support.
-# dpkg-buildpackage will be invoked from the root of the actual
-# upstream source tree where the debian/ directory has been copied.
-# Thus, all Makefile commands here operate relative to that root.
 %:
-	dh $@
-	# Note: --with golang removed. We handle Go build/install steps manually
-	# via overrides, and the Go toolchain is from the container, not Debian packages.
-	# This should prevent dh_golang from making problematic assumptions.
+	dh $@ --with=golang
 
-# Override dh_auto_clean to call upstream's clean target but ignore errors.
-override_dh_auto_clean:
-	@echo "Running overridden dh_auto_clean to clean upstream..."
-	-$(MAKE) clean
-
-# Override the build step to use upstream's Makefile.
-override_dh_auto_build:
-	@echo "Running overridden dh_auto_build to build upstream..."
-	# Ensure Go modules are downloaded and tidy before building.
-	# These commands are run in the current directory, which is the upstream source root.
-	go mod tidy
-	go mod download
-	$(MAKE) build GO_FLAGS="-buildmode=pie"
-	# Generate man page from the built binary
-	# The output is placed in debian/ so dh_installman can find it.
-	# DEB_PACKAGE_VERSION should be set in the environment by the CI workflow.
-	help2man --name="fan2go - Fan control daemon" \
-	         --no-info \
-	         --version-string="$${DEB_PACKAGE_VERSION:-unknown}" \
-	         --output=$(CURDIR)/debian/fan2go.1 \
-	         $(CURDIR)/bin/fan2go
-
-# Override dh_auto_test to run tests, show tail of log, and report status
-override_dh_auto_test:
-	@echo "Running tests via override_dh_auto_test (capturing to test_output.log)..."
-	# Run tests, redirecting output. The shell 'if' statement will handle the exit code.
-	if NO_COLOR=1 $(MAKE) test > test_output.log 2>&1; then \
-	    _TEST_EXIT_CODE=0; \
-	    echo "INFO: Tests completed successfully (exit code 0)."; \
-	else \
-	    _TEST_EXIT_CODE=$$?; \
-	    echo "ERROR: Tests failed with exit code $${_TEST_EXIT_CODE}."; \
-	fi; \
-	\
-	echo "-------------------- Last 100 lines of Test Output (test_output.log) --------------------"; \
-	tail -n 100 test_output.log || echo "INFO: test_output.log not found or unreadable."; \
-	echo "---------------------------------- End of Test Output Snippet -----------------------------------"; \
-	\
-	echo "INFO: Moving test_output.log for artifact upload..."; \
-	mv test_output.log $(CURDIR)/../test_output_`dpkg-parsechangelog -S Distribution || echo unknown`_`dpkg-architecture -qDEB_HOST_ARCH || echo unknown`.log || \
-		echo "WARNING: Could not move test_output.log for artifact upload."; \
-	\
-	if [ $${_TEST_EXIT_CODE} -ne 0 ]; then \
-	    exit $${_TEST_EXIT_CODE}; \
-	fi
+# Optional: If we need to run tests during build
+# override_dh_auto_test:
+# 	$(MAKE) test
