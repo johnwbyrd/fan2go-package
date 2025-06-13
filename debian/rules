@@ -1,0 +1,8 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with=golang
+
+# Optional: If we need to run tests during build
+# override_dh_auto_test:
+# 	$(MAKE) test

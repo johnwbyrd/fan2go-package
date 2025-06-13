@@ -1,0 +1,5 @@
+# Install the compiled binary
+bin/fan2go usr/bin
+
+# Install default configuration
+debian/fan2go.yaml etc/fan2go/
