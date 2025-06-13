@@ -17,9 +17,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: debian/sid
           fetch-depth: 0
           token: ${{ secrets.UPDATE_PAT }}
+
+      - name: Show all branches
+        run: |
+          git branch
 
       - name: Setup dependencies
         run: |
