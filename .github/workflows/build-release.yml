@@ -1,0 +1,80 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [debian/unstable]
+    paths:
+      - 'debian/**'
+      - '!**/README.md'
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distro: [bookworm, bullseye, trixie]
+    container:
+      image: golang:1.24.1-${{ matrix.distro }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: debian/unstable
+          fetch-depth: 0
+
+      - name: Merge upstream
+        run: git merge origin/upstream
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y devscripts lintian
+          apt-get build-dep -y .
+
+      - name: Run tests
+        run: |
+          make test > test-output.log 2>&1 || true
+          echo "===== LAST 100 TEST LINES ====="
+          tail -n 100 test-output.log
+          echo "==============================="
+
+      - name: Build package
+        run: dpkg-buildpackage -us -uc
+
+      - name: Run lintian checks
+        run: |
+          echo "===== LINTIAN CHECKS ====="
+          lintian ../*.deb ../*.dsc || true
+          echo "=========================="
+
+      - name: List build artifacts
+        run: |
+          echo "===== BUILD ARTIFACTS ====="
+          ls -la ../
+          echo "============================"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: fan2go-${{ matrix.distro }}-$(date +%Y%m%d)
+          tag_name: build-${{ matrix.distro }}-${{ github.run_id }}
+          body: |
+            Debian ${{ matrix.distro }} build
+            Source: ${{ github.sha }}
+            
+            This is an automated build from the debian/unstable branch.
+            Lintian checks have been run - see attached logs for details.
+          files: |
+            ../*.deb
+            ../*.dsc
+            ../*.tar.xz
+            ../*.buildinfo
+            ../*.changes
+            test-output.log
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

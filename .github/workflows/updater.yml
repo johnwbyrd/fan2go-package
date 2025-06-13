@@ -1,0 +1,63 @@
+name: Upstream Updater
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+  push:
+    branches: [debian/unstable]
+    paths:
+      - '.github/workflows/updater.yml'
+      - 'debian/gbp.conf'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.UPDATE_PAT }}
+
+      - name: Set up branches
+        run: |
+          git checkout -b main origin/main || git checkout main
+          git checkout -b upstream origin/upstream || git checkout upstream
+          git checkout debian/unstable
+
+      - name: Setup dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y devscripts git-buildpackage
+
+      - name: Import new upstream version
+        run: |
+          git config user.name "Automatic Packaging GitHub Action"
+          git config user.email "actions@github.com"
+          
+          # Check if there's a new upstream version first
+          if gbp import-orig --uscan --dry-run --upstream-branch=upstream --debian-branch=debian/unstable --pristine-tar --no-interactive; then
+            echo "New upstream version found, importing..."
+            gbp import-orig --uscan \
+              --upstream-branch=upstream \
+              --debian-branch=debian/unstable \
+              --pristine-tar \
+              --no-interactive
+            
+            # Push upstream branch and tags (DEP-14 format: upstream/<version>)
+            git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" upstream
+            git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" --tags
+            
+            # Push debian/unstable branch
+            git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" debian/unstable
+          else
+            echo "No new upstream version found"
+          fi
+
+      - name: Push pristine-tar updates
+        run: |
+          # Push pristine-tar branch if it exists
+          if git show-ref --verify --quiet refs/heads/pristine-tar; then
+            git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" pristine-tar
+          fi
