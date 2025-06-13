@@ -14,10 +14,10 @@ This repository follows the standard Debian `git-buildpackage` branch structure:
 
 ### Branch Layout
 - **`upstream`**: Contains pristine upstream source code from markusressel/fan2go
-- **`debian/sid`**: Main packaging branch with Debian-specific files
+- **`debian/unstable`**: Main packaging branch with Debian-specific files (DEP-14 compliant)
 - **`pristine-tar`**: Stores compressed tarballs for reproducible builds
 - **`main`**: Repository metadata and documentation
-- **`gbp`**: Git-buildpackage configuration branch
+- **`backup-pre-dep14`**: Backup of previous debian/sid structure
 
 ### Automated Workflows
 
@@ -25,16 +25,17 @@ This repository follows the standard Debian `git-buildpackage` branch structure:
 - Runs daily at midnight UTC and on workflow dispatch
 - Uses `gbp import-orig --uscan` to check for new upstream releases
 - Automatically imports new versions to the `upstream` branch
-- Updates `debian/sid` branch when new versions are found
+- Updates `debian/unstable` branch when new versions are found
 - Leverages `debian/watch` file to monitor https://github.com/markusressel/fan2go/tags
 
 **Build & Release (`.github/workflows/build-release.yml`)**
-- Triggered on pushes to `debian/sid` or workflow dispatch
+- Triggered on pushes to `debian/unstable` or workflow dispatch
 - Builds packages for multiple Debian distributions: bookworm, bullseye, trixie
 - Uses appropriate Golang containers for each distribution
 - Merges `upstream` branch content before building
 - Runs tests and captures output in release artifacts
-- Creates pre-releases with .deb packages for each distribution
+- **Includes lintian checks** for package quality assurance
+- Creates pre-releases with .deb packages and build artifacts for each distribution
 
 ## Packaging Commands
 
@@ -44,10 +45,10 @@ This repository follows the standard Debian `git-buildpackage` branch structure:
 dpkg-buildpackage -us -uc
 
 # Build with git-buildpackage
-gbp buildpackage --git-upstream-branch=upstream --git-debian-branch=debian/sid
+gbp buildpackage --git-upstream-branch=upstream --git-debian-branch=debian/unstable
 
 # Import new upstream version manually
-gbp import-orig --uscan --upstream-branch=upstream --debian-branch=debian/sid --pristine-tar
+gbp import-orig --uscan --upstream-branch=upstream --debian-branch=debian/unstable --pristine-tar
 
 # Check for upstream updates
 uscan --verbose --report
@@ -88,14 +89,14 @@ sudo apt-get install -f  # Fix any dependency issues
 ### Updating Packaging
 1. Modify files in `/debian/` directory
 2. Update `debian/changelog` with new entry using `dch -i`
-3. Commit changes to `debian/sid` branch
+3. Commit changes to `debian/unstable` branch
 4. Push to trigger automated builds
 
 ### Manual Upstream Update
 ```bash
 # If automatic updater fails, manually import upstream
-git checkout debian/sid
-gbp import-orig --uscan --upstream-branch=upstream --debian-branch=debian/sid --pristine-tar --no-interactive
+git checkout debian/unstable
+gbp import-orig --uscan --upstream-branch=upstream --debian-branch=debian/unstable --pristine-tar --no-interactive
 ```
 
 ### Release Management
@@ -111,3 +112,14 @@ This is **NOT** the upstream fan2go source code repository. This repository only
 - Git-buildpackage branch structure for maintaining pristine upstream sources
 
 The actual fan2go source code is maintained separately at https://github.com/markusressel/fan2go and is automatically imported into the `upstream` branch.
+
+## DEP-14 Compliance
+
+This repository follows DEP-14 (Debian Enhancement Proposal 14) standards:
+
+- **Branch naming**: Uses `debian/unstable` instead of non-standard `debian/sid`
+- **Tag format**: Follows `upstream/<version>` and `debian/<version>` patterns  
+- **Automated workflows**: Updated to work with DEP-14 branch structure
+- **Lintian integration**: Package quality checks included in build process
+
+The previous `debian/sid` structure has been preserved in the `backup-pre-dep14` branch for reference.
