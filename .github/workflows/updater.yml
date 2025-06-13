@@ -23,7 +23,7 @@ jobs:
       - name: Setup dependencies
         run: |
           sudo apt update
-          sudo apt install -y devscripts
+          sudo apt install -y devscripts git-buildpackage
 
       - name: Import new upstream version
         run: |
