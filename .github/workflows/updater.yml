@@ -33,6 +33,8 @@ jobs:
 
       - name: Import new upstream version
         run: |
+          git config user.name "Automatic Packaging GitHub Action"
+          git config user.email "actions@github.com"
           gbp import-orig --uscan \
             --upstream-branch=upstream \
             --debian-branch=debian/sid \
@@ -40,8 +42,6 @@ jobs:
             --no-interactive
           # Check for actual file changes
           if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "GitHub Actions"
-            git config user.email "actions@github.com"
             git commit -am "Auto-update to new upstream version"
             git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" debian/sid
           else
