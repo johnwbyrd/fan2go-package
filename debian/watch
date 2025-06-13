@@ -1,2 +1,3 @@
 version=4
-https://github.com/markusressel/fan2go/tags (\d\S+)\.tar\.gz
+opts=pgpsigmode=optional
+https://github.com/markusressel/fan2go/tags .*/archive/refs/tags/v?(\d[\d.]*)\.tar\.gz
