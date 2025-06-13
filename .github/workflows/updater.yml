@@ -20,8 +20,16 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.UPDATE_PAT }}
 
-      - name: Show all branches
+      - name: Set up branches
         run: |
+          git branch -r \
+            | grep -v '\->' \
+            | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" \
+            | while read remote; do \
+              git branch --track "${remote#origin/}" "$remote"; \
+            done
+          git fetch --all
+          git pull --all
           git branch
 
       - name: Setup dependencies
