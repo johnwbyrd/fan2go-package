@@ -15,9 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        distro: [bookworm, bullseye, trixie]
+        include:
+          - distro: bookworm
+            image: golang:bookworm
+          - distro: bullseye  
+            image: golang:bullseye
+          - distro: trixie
+            image: golang:bookworm  # Use bookworm for trixie until official image exists
     container:
-      image: golang:1.24.1-${{ matrix.distro }}
+      image: ${{ matrix.image }}
 
     steps:
       - name: Checkout repository
