@@ -1,0 +1,58 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [debian/sid]
+    paths:
+      - 'debian/**'
+      - '!**/README.md'
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distro: [bookworm, bullseye, trixie]
+    container:
+      image: golang:1.24.1-${{ matrix.distro }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: debian/sid
+          fetch-depth: 0
+
+      - name: Merge upstream
+        run: git merge origin/upstream
+
+      - name: Install dependencies
+        run: sudo apt-get build-dep -y .
+
+      - name: Run tests
+        run: |
+          make test > test-output.log 2>&1 || true
+          echo "===== LAST 100 TEST LINES ====="
+          tail -n 100 test-output.log
+          echo "==============================="
+
+      - name: Build package
+        run: dpkg-buildpackage -us -uc
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: fan2go-${{ matrix.distro }}-$(date +%Y%m%d)
+          tag_name: build-${{ matrix.distro }}-${{ github.run_id }}
+          body: |
+            Debian ${{ matrix.distro }} build
+            Source: ${{ github.sha }}
+          files: |
+            ../*.deb
+            test-output.log
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

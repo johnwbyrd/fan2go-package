@@ -1,0 +1,42 @@
+name: Upstream Updater
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+  push:
+    branches: [debian/sid]
+    paths:
+      - '.github/workflows/updater.yml'
+      - 'debian/gbp.conf'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: debian/sid
+          token: ${{ secrets.UPDATE_PAT }}
+
+      - name: Setup dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y devscripts
+
+      - name: Import new upstream version
+        run: |
+          gbp import-orig --uscan \
+            --upstream-branch=upstream \
+            --debian-branch=debian/sid \
+            --pristine-tar \
+            --no-interactive
+          
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git commit -am "Auto-update to new upstream version"
+
+      - name: Push updates
+        run: |
+          git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" debian/sid
