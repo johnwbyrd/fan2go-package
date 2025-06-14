@@ -68,43 +68,19 @@ jobs:
             gbp buildpackage --git-export-dir=../build-area --git-ignore-new --git-upstream-branch=upstream --git-debian-branch=debian/unstable -us -uc
             
             echo "===== CHECKING BUILD OUTPUTS ====="
-            if ls ../*.deb 1> /dev/null 2>&1; then
-              echo "✓ .deb files found:"
-              ls -la ../*.deb
-            else
-              echo "✗ No .deb files found - build failed"
-              exit 1
-            fi
-            
-            if ls ../*.dsc 1> /dev/null 2>&1; then
-              echo "✓ .dsc files found:"
-              ls -la ../*.dsc
-            else
-              echo "✗ No .dsc files found - build failed"
-              exit 1
-            fi
-            echo "================================="
+            cd ..
+            ls -la fan2go* || exit 1
             
             echo "===== LINTIAN CHECKS ====="
-            lintian ../*.deb ../*.dsc || true
+            lintian *.deb *.dsc || true
             echo "=========================="
-            echo "===== BUILD ARTIFACTS ====="
-            ls -la ../
-            echo "===== WORKSPACE CONTENTS ====="
-            find . -name "fan2go" -type f 2>/dev/null || true
-            ls -la bin/ 2>/dev/null || true
-            ls -la debian/tmp/ 2>/dev/null || true
-            echo "============================"
 
       - name: Copy artifacts from parent directory
         run: |
+          cd ..
           mkdir -p artifacts
-          cp ../*.deb artifacts/ 2>/dev/null || true
-          cp ../*.dsc artifacts/ 2>/dev/null || true  
-          cp ../*.tar.xz artifacts/ 2>/dev/null || true
-          cp ../*.buildinfo artifacts/ 2>/dev/null || true
-          cp ../*.changes artifacts/ 2>/dev/null || true
-          cp test-output.log artifacts/ 2>/dev/null || true
+          cp fan2go* artifacts/ 2>/dev/null || true
+          cp workspace/test-output.log artifacts/ 2>/dev/null || true
 
       - name: Create release
         if: |
