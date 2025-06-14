@@ -33,6 +33,9 @@ jobs:
           sudo apt install -y devscripts git-buildpackage
 
       - name: Import new upstream version
+        env:
+          DEBEMAIL: "actions@github.com"
+          DEBFULLNAME: "Automatic Packaging GitHub Action"
         run: |
           git config user.name "Automatic Packaging GitHub Action"
           git config user.email "actions@github.com"
