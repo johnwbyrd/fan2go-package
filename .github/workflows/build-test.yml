@@ -54,11 +54,19 @@ jobs:
         uses: addnab/docker-run-action@v3
         with:
           image: debian:trixie
+          # Mount GitHub workspace (includes .git) to /workspace and set as working dir
           options: -v ${{ github.workspace }}:/workspace -w /workspace
           run: |
             apt-get update
             apt-get install -y devscripts git-buildpackage lintian golang-go
             apt-get build-dep -y .
+            
+            # Configure git for container environment
+            # /workspace is the mount point we defined above in options
+            git config --global user.name "GitHub Actions"
+            git config --global user.email "actions@github.com"
+            git config --global --add safe.directory /workspace
+            
             gbp buildpackage --git-upstream-branch=upstream --git-debian-branch=debian/unstable -us -uc
             echo "===== LINTIAN CHECKS ====="
             lintian ../*.deb ../*.dsc || true
