@@ -12,6 +12,7 @@ on:
     branches: [debian/unstable]
     paths:
       - 'debian/**'
+      - '.github/workflows/**'
       - '!**/README.md'
   workflow_call:
     inputs:
