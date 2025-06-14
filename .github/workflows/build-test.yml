@@ -65,21 +65,38 @@ jobs:
             git config --global user.email "actions@github.com"
             git config --global --add safe.directory /workspace
             
-            gbp buildpackage --git-export-dir=../build-area --git-ignore-new --git-upstream-branch=upstream --git-debian-branch=debian/unstable -us -uc
+            gbp buildpackage --git-export-dir=/build-area --git-ignore-new --git-upstream-branch=upstream --git-debian-branch=debian/unstable -us -uc
             
             echo "===== CHECKING BUILD OUTPUTS ====="
-            ls -la ../build-area/fan2go* || exit 1
+            ls -la /build-area/fan2go* || exit 1
             
             echo "===== LINTIAN CHECKS ====="
-            lintian ../build-area/*.deb ../build-area/*.dsc || true
+            lintian /build-area/*.deb /build-area/*.dsc || true
+            
+            echo "===== MOVING ARTIFACTS TO WORKSPACE ====="
+            echo "Current working directory:"
+            pwd
+            echo "Contents of /build-area:"
+            ls -la /build-area/ || echo "No /build-area directory"
+            echo "Contents of /workspace:"
+            ls -la /workspace/ || echo "No /workspace directory"
+            
+            mkdir -p /workspace/artifacts
+            mv /build-area/fan2go* /workspace/artifacts/
+            echo "Artifacts moved to workspace:"
+            ls -la /workspace/artifacts/
 
-      - name: Copy artifacts 
+      - name: Verify artifacts 
         run: |
-          mkdir -p artifacts
-          cp ../build-area/fan2go* artifacts/
-          cp test-output.log artifacts/
-          echo "Artifacts copied:"
-          ls -la artifacts/
+          echo "Current working directory on host:"
+          pwd
+          echo "Contents of current directory:"
+          ls -la
+          echo "Checking artifacts directory:"
+          ls -la artifacts/ || echo "No artifacts directory"
+          cp test-output.log artifacts/ || echo "No test-output.log"
+          echo "Final artifacts:"
+          ls -la artifacts/ || echo "Still no artifacts directory"
 
       - name: Create release
         if: |
