@@ -11,6 +11,11 @@ export GOPROXY := https://proxy.golang.org,direct
 %:
 	dh $@ --with=golang
 
+# Override dh_auto_build to explicitly run the build target
+# dh_auto_build just runs 'make' which doesn't build the binary by default
+override_dh_auto_build:
+	$(MAKE) build
+
 # Skip dh_auto_test entirely - dh-golang's environment breaks Go modules test resolution  
 # Tests are run manually in CI workflow with proper output handling
 override_dh_auto_test:
