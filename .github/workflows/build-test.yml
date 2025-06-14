@@ -85,6 +85,11 @@ jobs:
             mv /build-area/fan2go* /workspace/artifacts/
             echo "Artifacts moved to workspace:"
             ls -la /workspace/artifacts/
+            
+            echo "===== EXTRACTING VERSION ====="
+            VERSION=$(ls /workspace/artifacts/fan2go_*.deb | head -1 | sed 's/.*fan2go_\(.*\)_amd64\.deb/\1/')
+            echo "Extracted version: $VERSION"
+            echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Verify artifacts 
         run: |
@@ -104,8 +109,8 @@ jobs:
           steps.upstream.outputs.new_upstream == 'true'
         uses: softprops/action-gh-release@v1
         with:
-          name: fan2go-${{ matrix.distro }}-$(date +%Y%m%d)
-          tag_name: build-${{ matrix.distro }}-${{ github.run_id }}
+          name: fan2go-${{ env.VERSION }}-${{ matrix.distro }}
+          tag_name: fan2go-${{ env.VERSION }}-${{ matrix.distro }}
           body: |
             Debian ${{ matrix.distro }} build
             Source: ${{ github.sha }}
