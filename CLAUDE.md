@@ -4,215 +4,415 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Debian packaging repository** for fan2go using the `git-buildpackage` (gbp) workflow. The repository creates and maintains Debian packages for the upstream fan2go project (https://github.com/markusressel/fan2go) with automated upstream tracking and multi-distribution builds.
+This is a **fully automated Debian packaging repository** for fan2go using the `git-buildpackage` (gbp) workflow. The repository creates and maintains Debian packages for the upstream fan2go project (https://github.com/markusressel/fan2go) with sophisticated automation for upstream tracking, smart version management, and multi-distribution builds.
 
 **Repository URL**: https://github.com/johnwbyrd/fan2go-package
 
-## Git-Buildpackage Architecture
+## Architecture Overview
 
-This repository follows the standard Debian `git-buildpackage` branch structure:
+### Git-Buildpackage Workflow
 
-### Branch Layout
+This repository implements a complete DEP-14 compliant git-buildpackage workflow with the following key components:
+
+**Branch Structure** (DEP-14 Standard):
 - **`main`**: Repository automation (.github/workflows/) and documentation
-- **`upstream`**: Contains pristine upstream source code from markusressel/fan2go
-- **`debian/unstable`**: Upstream source + debian/ packaging directory (DEP-14 compliant)
-- **`pristine-tar`**: Stores compressed tarballs for reproducible builds
+- **`upstream`**: Pristine upstream source code from markusressel/fan2go  
+- **`debian/unstable`**: Upstream source + debian/ packaging directory (buildable)
+- **`pristine-tar`**: Compressed tarballs for reproducible builds
 
-### Automated Workflows
+**Automation Features**:
+- Daily upstream monitoring with automatic import
+- Smart changelog version management (handles both new upstream versions and Debian revisions)
+- Multi-distribution package building (bookworm, bullseye, trixie)
+- Automated GitHub releases with proper version naming
+- Quality assurance with lintian checks
+- Clean build environments with proper artifact isolation
 
-**Upstream Updater (`.github/workflows/updater.yml`)**
-- Runs daily at midnight UTC and on workflow dispatch
-- Uses `gbp import-orig` to check for new upstream releases
-- Automatically imports new versions to the `upstream` branch
-- Merges upstream into `debian/unstable` branch when new versions are found
-- Leverages `debian/watch` file to monitor https://github.com/markusressel/fan2go/tags
-- Triggers automated builds via `build-test.yml` on successful import
+## Automated Workflows
 
-**Build & Test (`.github/workflows/build-test.yml`)**
-- Triggered on pushes to `main` or `debian/unstable`, or workflow dispatch
-- Builds packages for multiple Debian distributions: bookworm, bullseye, trixie
-- Checks out `debian/unstable` branch for building (contains upstream source + packaging)
-- Runs tests and captures output in release artifacts
-- **Includes lintian checks** for package quality assurance
-- Creates pre-releases with .deb packages and build artifacts for each distribution
+### Upstream Updater (`.github/workflows/updater.yml`)
 
-## Packaging Commands
+**Trigger**: Daily at midnight UTC, manual dispatch, workflow file changes
 
-### Local Development
+**Process**:
+1. **Detection**: Uses `uscan` with `debian/watch` to check for new fan2go releases
+2. **Import**: Uses `gbp import-orig --uscan --merge` to import new upstream versions
+3. **Smart Changelog Management**: Automatically updates `debian/changelog` with proper version logic
+4. **Branch Updates**: Pushes changes to `upstream`, `debian/unstable`, and `pristine-tar` branches
+5. **Trigger Builds**: Calls `build-test.yml` for new upstream versions
+
+**Smart Version Logic**:
 ```bash
-# Build package locally
-dpkg-buildpackage -us -uc
+# Detects version scenarios automatically
+CURRENT_VERSION=$(dpkg-parsechangelog --show-field Version)
+NEW_UPSTREAM_VERSION=$(git tag -l "upstream/*" | sort -V | tail -1 | sed 's/upstream\///')
 
-# Build with git-buildpackage
-gbp buildpackage --git-upstream-branch=upstream --git-debian-branch=debian/unstable
+# New upstream version: 0.9.0 -> 0.10.0
+if [[ "$CURRENT_UPSTREAM_VERSION" != "$NEW_UPSTREAM_VERSION" ]]; then
+    gbp dch --new-version=${NEW_UPSTREAM_VERSION}-1 --distribution=unstable --release
 
-# Import new upstream version manually
-gbp import-orig --uscan --upstream-branch=upstream --debian-branch=debian/unstable --pristine-tar
-
-# Check for upstream updates
-uscan --verbose --report
+# Same upstream, packaging update: 0.10.0-1 -> 0.10.0-2  
+elif [[ "$CURRENT_VERSION" != "none" ]]; then
+    dch -i --distribution=unstable --urgency=medium "Automated packaging update"
+fi
 ```
 
-### Testing Package Installation
-```bash
-# After building, test the .deb package
-sudo dpkg -i ../fan2go_*.deb
-sudo apt-get install -f  # Fix any dependency issues
+### Build & Test (`.github/workflows/build-test.yml`)
+
+**Trigger**: Changes to `debian/**` files, workflow calls, manual dispatch
+
+**Multi-Distribution Matrix**: bookworm, bullseye, trixie
+
+**Build Process**:
+1. **Clean Environment**: Uses Docker containers (debian:trixie) for reproducible builds
+2. **Proper Isolation**: Exports builds to `/build-area` outside mounted workspace to avoid git contamination
+3. **Artifact Management**: Moves build outputs to `/workspace/artifacts` for GitHub Actions access
+4. **Quality Checks**: Runs `lintian` on all `.deb` and `.dsc` files
+5. **Version Extraction**: Automatically extracts version from build artifacts for release naming
+6. **GitHub Releases**: Creates releases with names like `fan2go-0.10.0-1-trixie`
+
+**Build Environment Setup**:
+```yaml
+- name: Build in container
+  uses: addnab/docker-run-action@v3
+  with:
+    image: debian:trixie
+    options: -v ${{ github.workspace }}:/workspace -w /workspace
+    run: |
+      # Install dependencies
+      apt-get update && apt-get install -y devscripts git-buildpackage lintian golang-go
+      apt-get build-dep -y .
+      
+      # Configure git
+      git config --global user.name "GitHub Actions"
+      git config --global --add safe.directory /workspace
+      
+      # Build with proper export directory
+      gbp buildpackage --git-export-dir=/build-area --git-ignore-new \
+        --git-upstream-branch=upstream --git-debian-branch=debian/unstable -us -uc
+      
+      # Move artifacts to accessible location
+      mkdir -p /workspace/artifacts
+      mv /build-area/fan2go* /workspace/artifacts/
 ```
 
 ## Debian Package Configuration
 
 ### Key Files in `/debian/`
-- **`control`**: Package metadata, dependencies, maintainer info
-- **`rules`**: Build process automation (uses dh with golang support)
-- **`changelog`**: Version history and release notes
-- **`watch`**: Upstream version monitoring configuration
-- **`gbp.conf`**: Git-buildpackage configuration
+
+**Build Configuration**:
+- **`control`**: Package metadata, dependencies (golang-go, libsensors-dev, help2man)
+- **`rules`**: Custom build process for Go modules compatibility
+- **`source/format`**: 3.0 (quilt) format specification
+- **`gbp.conf`**: DEP-14 branch configuration
+
+**Package Files**:
+- **`changelog`**: Automatically managed version history
+- **`watch`**: Upstream monitoring (GitHub tags with regex)
 - **`fan2go.install`**: File installation mapping
-- **`fan2go.service`**: Systemd service definition
+- **`fan2go.service`**: Systemd service definition with security hardening
 - **`fan2go.yaml`**: Default configuration template
+- **`copyright`**: License information (AGPL-3.0)
 
 ### Build Dependencies
-- `debhelper-compat (= 13)`
-- `dh-golang`
-- `golang-1.23 (>= 1.23.1)`
-- `libsensors-dev`
-- `help2man`
 
-### Runtime Dependencies
-- `lm-sensors`
-- `systemd`
-
-## Workflow Maintenance
-
-### Updating Packaging
-1. Modify files in `/debian/` directory on `debian/unstable` branch
-2. Update `debian/changelog` with new entry using `dch -i`
-3. Commit changes to `debian/unstable` branch
-4. Push to trigger automated builds
-
-### Manual Upstream Update
-If the automatic updater fails, manually import upstream using `gbp import-orig --uscan` on the `debian/unstable` branch.
-
-### Release Management
-- Pre-releases are created automatically for each distribution build
-- Full releases should be created manually after testing
-- Each distribution gets its own build artifact
-
-## Repository Structure Understanding
-
-This repository contains:
-- **`main` branch**: Automation workflows (.github/workflows/) and documentation (README.debian.md, CLAUDE.md)
-- **`debian/unstable` branch**: Current upstream source code + debian/ packaging directory
-- **`upstream` branch**: Pristine upstream source imports
-
-The actual fan2go source code is maintained separately at https://github.com/markusressel/fan2go and is automatically imported and merged into the `debian/unstable` branch for packaging.
-
-## DEP-14 Compliance
-
-This repository follows DEP-14 (Debian Enhancement Proposal 14) standards:
-
-- **Branch naming**: Uses `debian/unstable` instead of non-standard `debian/sid`
-- **Tag format**: Follows `upstream/<version>` and `debian/<version>` patterns  
-- **Automated workflows**: Updated to work with DEP-14 branch structure
-- **Lintian integration**: Package quality checks included in build process
-
-The previous `debian/sid` structure has been preserved in the `backup-pre-dep14` branch for reference.
-
-## Go Modules + Debian Packaging Challenges
-
-This project encountered several challenges packaging a Go modules project with dh-golang:
-
-### Key Issues and Solutions
-
-**1. dh-golang vs Go Modules Compatibility**
-- `dh-golang` was designed for GOPATH, not Go modules
-- Required `GO111MODULE=on` and `GOPROXY=https://proxy.golang.org,direct`
-- Needed `DH_GOLANG_BUILDPKG := ./cmd/...` to avoid analyzing module cache
-
-**2. Test Environment Problems**
-- `dh_auto_test` with Go modules tests ALL dependencies, not just project code
-- Created ANSI spam from dependency tests (github.com/mgutz/ansi)
-- Solution: Override `dh_auto_test` and run manual tests before dpkg-buildpackage
-
-**3. Build Target Issues**
-- `dh_auto_build` runs `make` without target, doesn't build binary by default
-- Required `override_dh_auto_build: $(MAKE) build` to create executable
-- Upstream clean rule uses `rm` without `-f`, fails on fresh checkout
-
-**4. Critical Environment Variables**
-```bash
-export GO111MODULE := on                           # Enable Go modules  
-export GOPROXY := https://proxy.golang.org,direct  # Allow dependency downloads
-export DH_GOPKG := github.com/markusressel/fan2go  # Go import path
-export DH_GOLANG_BUILDPKG := ./cmd/...             # Limit analysis scope
+```debian
+Build-Depends: debhelper-compat (= 13),
+               dh-golang,
+               golang-go (>= 2:1.24~),
+               libsensors-dev,
+               help2man
 ```
 
-### Working debian/rules Pattern
+### Runtime Dependencies
 
-For Go modules projects, use these overrides:
-```bash
+```debian
+Depends: ${shlibs:Depends}, ${misc:Depends},
+         lm-sensors,
+         systemd
+```
+
+## Go Modules Integration Challenges (SOLVED)
+
+### Historical Issues
+
+This project overcame significant technical challenges packaging a Go modules project with dh-golang:
+
+**Problem 1: dh-golang vs Go Modules**
+- `dh-golang` was designed for GOPATH-style Go packages, not Go modules
+- Module cache analysis would break builds by testing all dependencies
+- Build environment conflicts with dependency resolution
+
+**Problem 2: GitHub Actions Contamination** 
+- Docker builds in GitHub Actions workspace caused dpkg-source failures
+- Git repository metadata contaminated source packages
+- Temporary GitHub Actions files appeared in source trees
+
+### Solutions Implemented
+
+**1. Custom debian/rules for Go Modules**:
+```makefile
+#!/usr/bin/make -f
+
+export GO111MODULE := on
+export GOPROXY := https://proxy.golang.org,direct
+
+%:
+	dh $@
+
 override_dh_auto_build:
 	$(MAKE) build
 
 override_dh_auto_test:
-	# Skip or run diagnostics - dh environment breaks module resolution
+	$(MAKE) test > test-output.log 2>&1 || true
+	@echo "===== TEST RESULTS (last 100 lines) ====="
+	@tail -n 100 test-output.log
+
+override_dh_auto_clean:
+	$(MAKE) clean || true
 ```
 
-### Future Improvements
+**2. Build Environment Isolation**:
+- Use `--git-export-dir=/build-area` to build outside workspace
+- Move artifacts back to mounted volume after build completion
+- Use `--git-ignore-new` for GitHub Actions temporary files
 
-- Replace GOPROXY workaround with proper Debian-packaged Go dependencies
-- Consider using debian:trixie for all builds (has golang-1.24 natively)
-- May need per-distribution branches when more complex packaging required
-
-## Repository Restructuring (2025-06-14)
-
-The repository was restructured to solve gbp merge conflicts:
-
-### Problem Solved
-- `gbp import-orig --merge` was overwriting automation files (.github/workflows/) during upstream merges
-- This destroyed the automated build infrastructure when importing new upstream versions
-
-### Solution Implemented
-- **Moved automation to `main` branch**: .github/workflows/, README.debian.md, CLAUDE.md
-- **Cleaned `debian/unstable` branch**: Now contains only upstream source + debian/ directory
-- **Updated workflows**: Check out `debian/unstable` from `main` for building
-- **Prevented workflow conflicts**: Removed redundant build-release.yml workflow
-- **Fixed workflow triggers**: Only trigger builds on relevant changes
-
-### Current Architecture
-```
-main branch:           .github/workflows/, README.debian.md, CLAUDE.md
-debian/unstable:       upstream source + debian/ (can be safely merged by gbp)
-upstream:              pristine upstream source
-pristine-tar:          upstream tarball metadata
+**3. Proper Environment Variables**:
+```bash
+env:
+  DEBEMAIL: "actions@github.com"
+  DEBFULLNAME: "Automatic Packaging GitHub Action"
 ```
 
-### gbp import-orig Behavior
-- Successfully imports upstream source to `upstream` branch
-- Creates pristine-tar metadata for new versions  
-- Merges upstream source into `debian/unstable` branch
-- **Does NOT automatically update debian/changelog**
+## Technical Architecture Details
 
-### Outstanding Issue: Changelog Management
+### Changelog Management System
 
-**Problem**: `gbp import-orig` does not update `debian/changelog` automatically, causing version mismatches:
-- debian/changelog shows old version (e.g., 0.1.0-1)
-- pristine-tar has new version files (e.g., 0.10.0)
-- `gbp buildpackage` fails looking for wrong pristine-tar files
+The automation implements sophisticated changelog management that handles multiple scenarios:
 
-**Build Process**: Reads version from first line of `debian/changelog`
+**Scenario Detection**:
+1. **New Upstream Version**: Detected by comparing `debian/changelog` version with latest `upstream/*` tag
+2. **Packaging Update**: Same upstream version but need to increment Debian revision
+3. **Initial Setup**: No existing changelog
 
-**Potential Solutions Being Evaluated**:
-1. Add `postimport` hook to gbp.conf to run `gbp dch` after import
-2. Use manual `gbp dch` commands in automation
-3. Implement custom versioning logic that handles Debian revision increments properly
+**Implementation**:
+```bash
+# Version parsing logic
+CURRENT_VERSION=$(dpkg-parsechangelog --show-field Version || echo "none")
+LATEST_UPSTREAM_TAG=$(git tag -l "upstream/*" | sort -V | tail -1)
+NEW_UPSTREAM_VERSION=${LATEST_UPSTREAM_TAG#upstream/}
 
-**Versioning Complexity**: Cannot simply append `-1` to upstream versions because:
-- May need multiple Debian revisions (0.10.0-1, 0.10.0-2, etc.)
-- Must handle existing versions properly
-- Debian versioning schemes are more complex than simple increments
+# Extract upstream portion (everything before first dash)
+if [[ "$CURRENT_VERSION" != "none" ]]; then
+  CURRENT_UPSTREAM_VERSION="${CURRENT_VERSION%%-*}"
+else
+  CURRENT_UPSTREAM_VERSION="none"
+fi
 
-### Workflow Triggers Fixed
-- **Upstream Updater**: Schedule + manual dispatch + updater.yml changes (for testing)
-- **Build & Test**: Only on debian/unstable changes to debian/** files + manual dispatch + workflow_call
+# Decision logic with proper tool selection
+if [[ "$CURRENT_UPSTREAM_VERSION" != "$NEW_UPSTREAM_VERSION" ]]; then
+  # New upstream version: use gbp dch
+  gbp dch --new-version=${NEW_UPSTREAM_VERSION}-1 \
+    --distribution=unstable --release --spawn-editor=never
+elif [[ "$CURRENT_VERSION" != "none" ]]; then
+  # Same upstream: use dch to increment Debian revision
+  dch -i --distribution=unstable --urgency=medium "Automated packaging update"
+fi
+```
+
+### Build Artifact Flow
+
+**Container Build Process**:
+1. **Source Export**: `gbp buildpackage --git-export-dir=/build-area` exports clean source
+2. **Package Creation**: Build system creates packages in `/build-area/`
+3. **Artifact Collection**: `mv /build-area/fan2go* /workspace/artifacts/`
+4. **Version Extraction**: Parse version from `.deb` filename for release naming
+
+**Host Artifact Processing**:
+1. **Verification**: Confirm artifacts exist in workspace
+2. **Version Setting**: Extract version and set `GITHUB_ENV` variable  
+3. **Release Creation**: Use version for consistent release naming across distributions
+
+### Version Naming Scheme
+
+**Release Names**: `fan2go-{VERSION}-{DISTRIBUTION}`
+- Example: `fan2go-0.10.0-1-trixie`
+- Consistent across all distributions for same package version
+- Extracted dynamically from build artifacts
+
+**Git Tags**: Same format as release names
+- Replaces run-ID based tags for better tracking
+- Allows easy correlation between releases and source versions
+
+## Development Workflows
+
+### Local Development Commands
+
+**Basic Package Building**:
+```bash
+# Clone and setup
+git clone https://github.com/johnwbyrd/fan2go-package.git
+cd fan2go-package
+git checkout debian/unstable
+
+# Quick build
+gbp buildpackage --git-upstream-branch=upstream --git-debian-branch=debian/unstable -us -uc
+
+# Clean build (recommended)
+gbp buildpackage --git-export-dir=../build-area --git-ignore-new \
+  --git-upstream-branch=upstream --git-debian-branch=debian/unstable -us -uc
+```
+
+**Upstream Updates**:
+```bash
+# Check for updates
+uscan --verbose --report
+
+# Import new version
+gbp import-orig --uscan --upstream-branch=upstream --debian-branch=debian/unstable --pristine-tar
+
+# Update changelog (automated in CI)
+gbp dch --new-version=NEW_VERSION-1 --distribution=unstable --release --spawn-editor=never
+```
+
+**Quality Assurance**:
+```bash
+# Lint checks
+lintian ../*.deb ../*.dsc
+
+# Test installation
+sudo dpkg -i ../fan2go_*.deb
+sudo apt-get install -f
+```
+
+### Packaging Modifications
+
+**Workflow for Changes**:
+1. **Branch**: Work on `debian/unstable` branch
+2. **Modify**: Edit files in `debian/` directory
+3. **Changelog**: Add entry with `dch -i`
+4. **Test**: Local build with `gbp buildpackage --git-ignore-new`
+5. **Quality**: Run `lintian` checks
+6. **Commit**: Standard git workflow
+7. **Push**: Triggers automated builds
+
+**File Modification Guidelines**:
+- **Dependencies**: Update `debian/control`
+- **Build Process**: Modify `debian/rules`
+- **Service Config**: Edit `debian/fan2go.service`
+- **Installation**: Update `debian/fan2go.install`
+- **Versioning**: Let automation handle `debian/changelog`
+
+## Repository Maintenance
+
+### Monitoring and Troubleshooting
+
+**Automated Health Checks**:
+- Daily upstream monitoring (check GitHub Actions logs)
+- Build success across all distributions
+- Lintian warning/error trends
+- Release artifact completeness
+
+**Common Issues and Solutions**:
+
+**Issue**: Build fails with git repository errors
+```bash
+# Solution: Ensure clean export directory usage
+gbp buildpackage --git-export-dir=/build-area --git-ignore-new
+```
+
+**Issue**: Go module dependency failures
+```bash
+# Solution: Verify environment variables in debian/rules
+export GO111MODULE=on
+export GOPROXY=https://proxy.golang.org,direct
+```
+
+**Issue**: Changelog version mismatches
+```bash
+# Solution: Check automation logic in updater.yml
+# Should auto-detect and handle version scenarios
+```
+
+### Workflow Debugging
+
+**Upstream Updater Debug**:
+- Check `uscan --verbose --report` output
+- Verify `debian/watch` file syntax
+- Confirm `gbp import-orig` success
+- Check changelog update logic
+
+**Build Process Debug**:
+- Review Docker container logs
+- Check artifact movement from `/build-area` to `/workspace/artifacts`
+- Verify version extraction from `.deb` filenames
+- Confirm `lintian` results
+
+### Security and Hardening
+
+**Service Security** (`debian/fan2go.service`):
+```systemd
+[Service]
+# Security Hardening
+ProtectSystem=strict
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=/var/lib/fan2go /var/log/fan2go /sys/class/hwmon /sys/devices/platform
+```
+
+**Build Security**:
+- Clean build environments prevent dependency contamination
+- Reproducible builds with `pristine-tar`
+- Automated dependency management avoids manual intervention
+- Lintian checks enforce packaging standards
+
+## Integration Points
+
+### GitHub Actions Environment
+
+**Required Secrets**:
+- `UPDATE_PAT`: Personal access token for automated commits and pushes
+- `GITHUB_TOKEN`: Automatic token for release creation (provided by GitHub)
+
+**Environment Variables**:
+- `DEBEMAIL`: Set for changelog generation tools
+- `DEBFULLNAME`: Set for package maintainer identification
+- `VERSION`: Dynamically extracted from build artifacts
+
+### External Dependencies
+
+**Upstream Monitoring**:
+- Depends on https://github.com/markusressel/fan2go tag format
+- Uses GitHub's tag/release API through `uscan`
+- Requires stable upstream tarball URLs
+
+**Build Dependencies**:
+- Debian package repositories for build tools
+- Go module proxy (proxy.golang.org) for dependency resolution
+- Docker Hub for base container images
+
+## Future Enhancements
+
+### Potential Improvements
+
+**Dependency Management**:
+- Package all Go dependencies for Debian to eliminate GOPROXY dependency
+- Create proper Debian source packages for major dependencies
+- Implement offline-capable builds
+
+**Build Process**:
+- Add pbuilder/cowbuilder support for even cleaner builds
+- Implement cross-compilation for different architectures
+- Add automated testing in various environments
+
+**Release Management**:
+- Implement automatic Debian repository publishing
+- Add integration with Debian mentors for official packaging
+- Create automated backport generation for older distributions
+
+**Quality Assurance**:
+- Add automated runtime testing of packaged software
+- Implement regression testing across distribution upgrades
+- Add performance benchmarking for new versions
+
+This repository represents a complete, production-ready Debian packaging solution with sophisticated automation that handles all aspects of maintaining a Debian package for a Go modules project.
