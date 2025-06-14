@@ -68,17 +68,16 @@ jobs:
             gbp buildpackage --git-export-dir=../build-area --git-ignore-new --git-upstream-branch=upstream --git-debian-branch=debian/unstable -us -uc
             
             echo "===== CHECKING BUILD OUTPUTS ====="
-            echo "Current directory:"
-            find . -type f
-            echo "Build area:"
-            find ../build-area -type f 2>/dev/null || true
+            ls -la ../build-area/fan2go* || exit 1
+            
+            echo "===== LINTIAN CHECKS ====="
+            lintian ../build-area/*.deb ../build-area/*.dsc || true
 
-      - name: Copy artifacts from parent directory
+      - name: Copy artifacts 
         run: |
-          cd ..
           mkdir -p artifacts
-          cp fan2go* artifacts/ 2>/dev/null || true
-          cp workspace/test-output.log artifacts/ 2>/dev/null || true
+          cp ../build-area/fan2go* artifacts/ 2>/dev/null || true
+          cp test-output.log artifacts/ 2>/dev/null || true
 
       - name: Create release
         if: |
