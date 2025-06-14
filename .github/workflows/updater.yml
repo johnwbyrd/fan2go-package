@@ -90,6 +90,7 @@ jobs:
                 --distribution=unstable \
                 --release \
                 --commit \
+                --spawn-editor=never \
                 --commit-msg="Update changelog for ${NEW_UPSTREAM_VERSION} upstream release" \
                 --debian-branch=debian/unstable \
                 --upstream-branch=upstream
@@ -114,6 +115,7 @@ jobs:
                 --distribution=unstable \
                 --release \
                 --commit \
+                --spawn-editor=never \
                 --commit-msg="Initial changelog for ${NEW_UPSTREAM_VERSION}" \
                 --debian-branch=debian/unstable \
                 --upstream-branch=upstream
