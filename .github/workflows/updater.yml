@@ -73,6 +73,8 @@ jobs:
   build_and_release:
     needs: update
     if: needs.update.outputs.NEW_UPSTREAM == 'true'
+    permissions:
+      contents: write
     uses: ./.github/workflows/build-test.yml
     with:
       create_release: true
