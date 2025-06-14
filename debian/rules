@@ -2,6 +2,7 @@
 
 export DH_GOLANG_GO_GENERATE := 1
 export GO111MODULE := on
+export DH_GOPKG := github.com/markusressel/fan2go
 
 # TEMPORARY: Enable GOPROXY to download dependencies during build
 # TODO: Replace with Debian-packaged Go dependencies for proper packaging
