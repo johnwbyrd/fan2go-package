@@ -65,7 +65,7 @@ jobs:
             git config --global user.email "actions@github.com"
             git config --global --add safe.directory /workspace
             
-            gbp buildpackage --git-upstream-branch=upstream --git-debian-branch=debian/unstable --git-ignore-new -us -uc
+            gbp buildpackage --git-upstream-branch=upstream --git-debian-branch=debian/unstable --git-ignore-new -us -uc -i"workspace/*"
             
             echo "===== CHECKING BUILD OUTPUTS ====="
             if ls ../*.deb 1> /dev/null 2>&1; then
