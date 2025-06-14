@@ -11,6 +11,7 @@ export GOPROXY := https://proxy.golang.org,direct
 %:
 	dh $@ --with=golang
 
-# Skip dh_auto_test to avoid ANSI spam and duplicate test runs
-# We already run 'make test' manually before dpkg-buildpackage
+# Override dh_auto_test to run only fan2go tests, not dependency tests
+# dh_auto_test tries to test all dependencies which can fail in container environment
 override_dh_auto_test:
+	$(MAKE) test
