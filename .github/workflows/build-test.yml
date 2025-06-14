@@ -64,6 +64,10 @@ jobs:
             echo "=========================="
             echo "===== BUILD ARTIFACTS ====="
             ls -la ../
+            echo "===== WORKSPACE CONTENTS ====="
+            find . -name "fan2go" -type f 2>/dev/null || true
+            ls -la bin/ 2>/dev/null || true
+            ls -la debian/tmp/ 2>/dev/null || true
             echo "============================"
 
       - name: Copy artifacts from parent directory
