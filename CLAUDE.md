@@ -123,3 +123,49 @@ This repository follows DEP-14 (Debian Enhancement Proposal 14) standards:
 - **Lintian integration**: Package quality checks included in build process
 
 The previous `debian/sid` structure has been preserved in the `backup-pre-dep14` branch for reference.
+
+## Go Modules + Debian Packaging Challenges
+
+This project encountered several challenges packaging a Go modules project with dh-golang:
+
+### Key Issues and Solutions
+
+**1. dh-golang vs Go Modules Compatibility**
+- `dh-golang` was designed for GOPATH, not Go modules
+- Required `GO111MODULE=on` and `GOPROXY=https://proxy.golang.org,direct`
+- Needed `DH_GOLANG_BUILDPKG := ./cmd/...` to avoid analyzing module cache
+
+**2. Test Environment Problems**
+- `dh_auto_test` with Go modules tests ALL dependencies, not just project code
+- Created ANSI spam from dependency tests (github.com/mgutz/ansi)
+- Solution: Override `dh_auto_test` and run manual tests before dpkg-buildpackage
+
+**3. Build Target Issues**
+- `dh_auto_build` runs `make` without target, doesn't build binary by default
+- Required `override_dh_auto_build: $(MAKE) build` to create executable
+- Upstream clean rule uses `rm` without `-f`, fails on fresh checkout
+
+**4. Critical Environment Variables**
+```bash
+export GO111MODULE := on                           # Enable Go modules  
+export GOPROXY := https://proxy.golang.org,direct  # Allow dependency downloads
+export DH_GOPKG := github.com/markusressel/fan2go  # Go import path
+export DH_GOLANG_BUILDPKG := ./cmd/...             # Limit analysis scope
+```
+
+### Working debian/rules Pattern
+
+For Go modules projects, use these overrides:
+```bash
+override_dh_auto_build:
+	$(MAKE) build
+
+override_dh_auto_test:
+	# Skip or run diagnostics - dh environment breaks module resolution
+```
+
+### Future Improvements
+
+- Replace GOPROXY workaround with proper Debian-packaged Go dependencies
+- Consider using debian:trixie for all builds (has golang-1.24 natively)
+- May need per-distribution branches when more complex packaging required

@@ -1,39 +1,18 @@
 #!/usr/bin/make -f
 
-export DH_GOLANG_GO_GENERATE := 1
 export GO111MODULE := on
-export DH_GOPKG := github.com/markusressel/fan2go
-
-# TEMPORARY: Enable GOPROXY to download dependencies during build
-# TODO: Replace with Debian-packaged Go dependencies for proper packaging
-# This is needed because fan2go has 39 Go dependencies not yet packaged for Debian
 export GOPROXY := https://proxy.golang.org,direct
 
 %:
-	dh $@ --with=golang
+	dh $@
 
 # Override dh_auto_build to explicitly run the build target
 # dh_auto_build just runs 'make' which doesn't build the binary by default
 override_dh_auto_build:
 	$(MAKE) build
 
-# Override dh_auto_test to run Go environment diagnostics instead of tests
-# This helps us understand why dh-golang's environment breaks module resolution
 override_dh_auto_test:
-	@echo "===== GO ENVIRONMENT DIAGNOSTICS ====="
-	@echo "Working directory: $$(pwd)"
-	@echo "GOPATH: $$(go env GOPATH)"
-	@echo "GOMOD: $$(go env GOMOD)"
-	@echo "GO111MODULE: $$(go env GO111MODULE)"
-	@echo "GOPROXY: $$(go env GOPROXY)"
-	@echo ""
-	@echo "===== MODULE INFO ====="
-	go list -m || echo "go list -m failed"
-	@echo ""
-	@echo "===== WHAT ./... EXPANDS TO ====="
-	go list ./... || echo "go list ./... failed"
-	@echo ""
-	@echo "===== DIRECTORY STRUCTURE ====="
-	@find . -type d -name "github.com" 2>/dev/null || echo "No github.com directories"
-	@ls -la obj-x86_64-linux-gnu/ 2>/dev/null || echo "No obj-x86_64-linux-gnu directory"
-	@echo "===== END DIAGNOSTICS ====="
+	$(MAKE) test > test-output.log 2>&1 || true
+	@echo "===== TEST RESULTS (last 100 lines) ====="
+	@tail -n 100 test-output.log
+	@echo "===== END TEST RESULTS ====="
