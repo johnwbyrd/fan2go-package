@@ -16,3 +16,6 @@ override_dh_auto_test:
 	@echo "===== TEST RESULTS (last 100 lines) ====="
 	@tail -n 100 test-output.log
 	@echo "===== END TEST RESULTS ====="
+
+override_dh_auto_clean:
+	$(MAKE) clean || true
