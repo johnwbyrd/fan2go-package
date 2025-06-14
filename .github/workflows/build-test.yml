@@ -86,12 +86,8 @@ jobs:
             echo "Artifacts moved to workspace:"
             ls -la /workspace/artifacts/
             
-            echo "===== EXTRACTING VERSION ====="
-            VERSION=$(ls /workspace/artifacts/fan2go_*.deb | head -1 | sed 's/.*fan2go_\(.*\)_amd64\.deb/\1/')
-            echo "Extracted version: $VERSION"
-            echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Verify artifacts 
+      - name: Verify artifacts and extract version
         run: |
           echo "Current working directory on host:"
           pwd
@@ -102,6 +98,11 @@ jobs:
           cp test-output.log artifacts/ || echo "No test-output.log"
           echo "Final artifacts:"
           ls -la artifacts/ || echo "Still no artifacts directory"
+          
+          echo "===== EXTRACTING VERSION ====="
+          VERSION=$(ls artifacts/fan2go_*.deb | head -1 | sed 's/.*fan2go_\(.*\)_amd64\.deb/\1/')
+          echo "Extracted version: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Create release
         if: |
