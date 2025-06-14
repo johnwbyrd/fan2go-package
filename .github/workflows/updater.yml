@@ -41,7 +41,19 @@ jobs:
           echo "Checking for new upstream versions..."
           if uscan --verbose --report-status 2>&1 | grep -q "Newer package available"; then
             echo "New upstream version found, importing..."
-            gbp import-orig --uscan --merge --replace-imported \
+            
+            # Get the new version number
+            NEW_VERSION=$(uscan --report --dehs | grep -o '<upstream-version>[^<]*' | sed 's/<upstream-version>//')
+            echo "Detected upstream version: $NEW_VERSION"
+            
+            # Delete existing tag if it exists to allow re-import
+            if git tag -l | grep -q "upstream/$NEW_VERSION"; then
+              echo "Deleting existing upstream tag upstream/$NEW_VERSION"
+              git tag -d "upstream/$NEW_VERSION" || true
+              git push origin --delete "upstream/$NEW_VERSION" || true
+            fi
+            
+            gbp import-orig --uscan --merge \
               --upstream-branch=upstream \
               --debian-branch=debian/unstable \
               --pristine-tar \

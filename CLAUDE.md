@@ -22,7 +22,7 @@ This repository follows the standard Debian `git-buildpackage` branch structure:
 
 **Upstream Updater (`.github/workflows/updater.yml`)**
 - Runs daily at midnight UTC and on workflow dispatch
-- Uses `gbp import-orig --uscan --merge --replace-imported` to check for new upstream releases
+- Uses `gbp import-orig` to check for new upstream releases
 - Automatically imports new versions to the `upstream` branch
 - Merges upstream into `debian/unstable` branch when new versions are found
 - Leverages `debian/watch` file to monitor https://github.com/markusressel/fan2go/tags
@@ -92,11 +92,7 @@ sudo apt-get install -f  # Fix any dependency issues
 4. Push to trigger automated builds
 
 ### Manual Upstream Update
-```bash
-# If automatic updater fails, manually import upstream
-git checkout debian/unstable
-gbp import-orig --uscan --merge --replace-imported --upstream-branch=upstream --debian-branch=debian/unstable --pristine-tar --no-interactive
-```
+If the automatic updater fails, manually import upstream using `gbp import-orig --uscan` on the `debian/unstable` branch.
 
 ### Release Management
 - Pre-releases are created automatically for each distribution build
