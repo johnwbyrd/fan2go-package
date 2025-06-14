@@ -45,7 +45,7 @@ jobs:
           options: -v ${{ github.workspace }}:/workspace -w /workspace
           run: |
             apt-get update
-            apt-get install -y devscripts lintian golang-1.24
+            apt-get install -y devscripts lintian golang-go
             apt-get build-dep -y .
             make test > test-output.log 2>&1 || true
             echo "===== LAST 100 TEST LINES ====="
