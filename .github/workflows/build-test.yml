@@ -26,13 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - distro: bookworm
-            image: golang:bookworm
-          - distro: bullseye  
-            image: golang:bullseye
-          - distro: trixie
-            image: golang:bookworm  # Use bookworm for trixie until official image exists
+        distro: [bookworm, bullseye, trixie]
 
     steps:
       - name: Checkout repository
@@ -47,11 +41,11 @@ jobs:
       - name: Build in container
         uses: addnab/docker-run-action@v3
         with:
-          image: ${{ matrix.image }}
+          image: debian:trixie
           options: -v ${{ github.workspace }}:/workspace -w /workspace
           run: |
             apt-get update
-            apt-get install -y devscripts lintian
+            apt-get install -y devscripts lintian golang-1.24
             apt-get build-dep -y .
             make test > test-output.log 2>&1 || true
             echo "===== LAST 100 TEST LINES ====="
