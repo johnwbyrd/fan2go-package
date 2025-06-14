@@ -3,6 +3,11 @@
 export DH_GOLANG_GO_GENERATE := 1
 export GO111MODULE := on
 
+# TEMPORARY: Enable GOPROXY to download dependencies during build
+# TODO: Replace with Debian-packaged Go dependencies for proper packaging
+# This is needed because fan2go has 39 Go dependencies not yet packaged for Debian
+export GOPROXY := https://proxy.golang.org,direct
+
 %:
 	dh $@ --with=golang
 
