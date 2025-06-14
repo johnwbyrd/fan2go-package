@@ -59,11 +59,70 @@ jobs:
               --pristine-tar \
               --no-interactive
             
+            # Smart changelog version management
+            echo "=== Changelog Version Management ==="
+            
+            # Extract versions for comparison
+            CURRENT_VERSION=$(dpkg-parsechangelog --show-field Version || echo "none")
+            LATEST_UPSTREAM_TAG=$(git tag -l "upstream/*" | sort -V | tail -1)
+            NEW_UPSTREAM_VERSION=${LATEST_UPSTREAM_TAG#upstream/}
+            
+            echo "Current changelog version: $CURRENT_VERSION"
+            echo "Newly imported upstream version: $NEW_UPSTREAM_VERSION"
+            
+            # Parse upstream portion of current version (everything before first dash)
+            if [[ "$CURRENT_VERSION" != "none" ]]; then
+              CURRENT_UPSTREAM_VERSION="${CURRENT_VERSION%%-*}"
+            else
+              CURRENT_UPSTREAM_VERSION="none"
+            fi
+            echo "Current upstream portion: $CURRENT_UPSTREAM_VERSION"
+            
+            # Decision logic
+            if [[ "$CURRENT_UPSTREAM_VERSION" != "$NEW_UPSTREAM_VERSION" ]]; then
+              echo ">>> New upstream version detected: $CURRENT_UPSTREAM_VERSION -> $NEW_UPSTREAM_VERSION"
+              echo ">>> Creating new changelog entry for ${NEW_UPSTREAM_VERSION}-1"
+              
+              gbp dch --new-version=${NEW_UPSTREAM_VERSION}-1 \
+                --distribution=unstable \
+                --release \
+                --commit \
+                --commit-msg="Update changelog for ${NEW_UPSTREAM_VERSION} upstream release" \
+                --debian-branch=debian/unstable \
+                --upstream-branch=upstream
+                
+            elif [[ "$CURRENT_VERSION" != "none" ]]; then
+              echo ">>> Same upstream version, incrementing Debian revision"
+              echo ">>> Using dch -i to increment from $CURRENT_VERSION"
+              
+              dch -i \
+                --distribution=unstable \
+                --urgency=medium \
+                "Automated packaging update"
+              
+              # Commit the changelog update
+              git add debian/changelog
+              git commit -m "Increment Debian revision for packaging updates"
+              
+            else
+              echo ">>> No existing changelog, creating initial entry for ${NEW_UPSTREAM_VERSION}-1"
+              
+              gbp dch --new-version=${NEW_UPSTREAM_VERSION}-1 \
+                --distribution=unstable \
+                --release \
+                --commit \
+                --commit-msg="Initial changelog for ${NEW_UPSTREAM_VERSION}" \
+                --debian-branch=debian/unstable \
+                --upstream-branch=upstream
+            fi
+            
+            echo "=== Changelog update completed ==="
+            
             # Push upstream branch and tags (DEP-14 format: upstream/<version>)
             git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" upstream
             git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" --tags
             
-            # Push debian/unstable branch
+            # Push debian/unstable branch (now includes updated changelog)
             git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" debian/unstable
             
             echo "NEW_UPSTREAM=true" >> $GITHUB_OUTPUT
