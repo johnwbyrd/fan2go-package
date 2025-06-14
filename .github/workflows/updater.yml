@@ -41,7 +41,7 @@ jobs:
           echo "Checking for new upstream versions..."
           if uscan --verbose --report-status 2>&1 | grep -q "Newer package available"; then
             echo "New upstream version found, importing..."
-            gbp import-orig --uscan --merge \
+            gbp import-orig --uscan --merge --replace-imported \
               --upstream-branch=upstream \
               --debian-branch=debian/unstable \
               --pristine-tar \
