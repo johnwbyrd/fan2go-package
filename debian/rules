@@ -11,6 +11,6 @@ export GOPROXY := https://proxy.golang.org,direct
 %:
 	dh $@ --with=golang
 
-# Optional: If we need to run tests during build
-# override_dh_auto_test:
-# 	$(MAKE) test
+# Skip dh_auto_test to avoid ANSI spam and duplicate test runs
+# We already run 'make test' manually before dpkg-buildpackage
+override_dh_auto_test:
