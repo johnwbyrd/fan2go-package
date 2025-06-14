@@ -164,3 +164,55 @@ override_dh_auto_test:
 - Replace GOPROXY workaround with proper Debian-packaged Go dependencies
 - Consider using debian:trixie for all builds (has golang-1.24 natively)
 - May need per-distribution branches when more complex packaging required
+
+## Repository Restructuring (2025-06-14)
+
+The repository was restructured to solve gbp merge conflicts:
+
+### Problem Solved
+- `gbp import-orig --merge` was overwriting automation files (.github/workflows/) during upstream merges
+- This destroyed the automated build infrastructure when importing new upstream versions
+
+### Solution Implemented
+- **Moved automation to `main` branch**: .github/workflows/, README.debian.md, CLAUDE.md
+- **Cleaned `debian/unstable` branch**: Now contains only upstream source + debian/ directory
+- **Updated workflows**: Check out `debian/unstable` from `main` for building
+- **Prevented workflow conflicts**: Removed redundant build-release.yml workflow
+- **Fixed workflow triggers**: Only trigger builds on relevant changes
+
+### Current Architecture
+```
+main branch:           .github/workflows/, README.debian.md, CLAUDE.md
+debian/unstable:       upstream source + debian/ (can be safely merged by gbp)
+upstream:              pristine upstream source
+pristine-tar:          upstream tarball metadata
+```
+
+### gbp import-orig Behavior
+- Successfully imports upstream source to `upstream` branch
+- Creates pristine-tar metadata for new versions  
+- Merges upstream source into `debian/unstable` branch
+- **Does NOT automatically update debian/changelog**
+
+### Outstanding Issue: Changelog Management
+
+**Problem**: `gbp import-orig` does not update `debian/changelog` automatically, causing version mismatches:
+- debian/changelog shows old version (e.g., 0.1.0-1)
+- pristine-tar has new version files (e.g., 0.10.0)
+- `gbp buildpackage` fails looking for wrong pristine-tar files
+
+**Build Process**: Reads version from first line of `debian/changelog`
+
+**Potential Solutions Being Evaluated**:
+1. Add `postimport` hook to gbp.conf to run `gbp dch` after import
+2. Use manual `gbp dch` commands in automation
+3. Implement custom versioning logic that handles Debian revision increments properly
+
+**Versioning Complexity**: Cannot simply append `-1` to upstream versions because:
+- May need multiple Debian revisions (0.10.0-1, 0.10.0-2, etc.)
+- Must handle existing versions properly
+- Debian versioning schemes are more complex than simple increments
+
+### Workflow Triggers Fixed
+- **Upstream Updater**: Schedule + manual dispatch + updater.yml changes (for testing)
+- **Build & Test**: Only on debian/unstable changes to debian/** files + manual dispatch + workflow_call
