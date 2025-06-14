@@ -76,8 +76,10 @@ jobs:
       - name: Copy artifacts 
         run: |
           mkdir -p artifacts
-          cp ../build-area/fan2go* artifacts/ 2>/dev/null || true
-          cp test-output.log artifacts/ 2>/dev/null || true
+          cp ../build-area/fan2go* artifacts/
+          cp test-output.log artifacts/
+          echo "Artifacts copied:"
+          ls -la artifacts/
 
       - name: Create release
         if: |
