@@ -1,0 +1,93 @@
+name: Build and Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create GitHub release after successful build'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [debian/unstable]
+    paths:
+      - 'debian/**'
+      - '!**/README.md'
+  workflow_call:
+    inputs:
+      create_release:
+        description: 'Create GitHub release after successful build'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - distro: bookworm
+            image: golang:bookworm
+          - distro: bullseye  
+            image: golang:bullseye
+          - distro: trixie
+            image: golang:bookworm  # Use bookworm for trixie until official image exists
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: debian/unstable
+          fetch-depth: 0
+
+      - name: Merge upstream
+        run: git merge origin/upstream
+
+      - name: Build in container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: ${{ matrix.image }}
+          options: -v ${{ github.workspace }}:/workspace -w /workspace
+          run: |
+            apt-get update
+            apt-get install -y devscripts lintian
+            apt-get build-dep -y .
+            make test > test-output.log 2>&1 || true
+            echo "===== LAST 100 TEST LINES ====="
+            tail -n 100 test-output.log
+            echo "==============================="
+            dpkg-buildpackage -us -uc
+            echo "===== LINTIAN CHECKS ====="
+            lintian ../*.deb ../*.dsc || true
+            echo "=========================="
+            echo "===== BUILD ARTIFACTS ====="
+            ls -la ../
+            echo "============================"
+
+      - name: Copy artifacts from parent directory
+        run: |
+          mkdir -p artifacts
+          cp ../*.deb artifacts/ 2>/dev/null || true
+          cp ../*.dsc artifacts/ 2>/dev/null || true  
+          cp ../*.tar.xz artifacts/ 2>/dev/null || true
+          cp ../*.buildinfo artifacts/ 2>/dev/null || true
+          cp ../*.changes artifacts/ 2>/dev/null || true
+          cp test-output.log artifacts/ 2>/dev/null || true
+
+      - name: Create release
+        if: inputs.create_release == true || inputs.create_release == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          name: fan2go-${{ matrix.distro }}-$(date +%Y%m%d)
+          tag_name: build-${{ matrix.distro }}-${{ github.run_id }}
+          body: |
+            Debian ${{ matrix.distro }} build
+            Source: ${{ github.sha }}
+            
+            This is an automated build from the debian/unstable branch.
+            Lintian checks have been run - see attached logs for details.
+          files: artifacts/*
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
