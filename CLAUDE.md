@@ -13,26 +13,25 @@ This is a **Debian packaging repository** for fan2go using the `git-buildpackage
 This repository follows the standard Debian `git-buildpackage` branch structure:
 
 ### Branch Layout
+- **`main`**: Repository automation (.github/workflows/) and documentation
 - **`upstream`**: Contains pristine upstream source code from markusressel/fan2go
-- **`debian/unstable`**: Main packaging branch with Debian-specific files (DEP-14 compliant)
+- **`debian/unstable`**: Upstream source + debian/ packaging directory (DEP-14 compliant)
 - **`pristine-tar`**: Stores compressed tarballs for reproducible builds
-- **`main`**: Repository metadata and documentation
-- **`backup-pre-dep14`**: Backup of previous debian/sid structure
 
 ### Automated Workflows
 
 **Upstream Updater (`.github/workflows/updater.yml`)**
 - Runs daily at midnight UTC and on workflow dispatch
-- Uses `gbp import-orig --uscan` to check for new upstream releases
+- Uses `gbp import-orig --uscan --merge --replace-imported` to check for new upstream releases
 - Automatically imports new versions to the `upstream` branch
-- Updates `debian/unstable` branch when new versions are found
+- Merges upstream into `debian/unstable` branch when new versions are found
 - Leverages `debian/watch` file to monitor https://github.com/markusressel/fan2go/tags
+- Triggers automated builds via `build-test.yml` on successful import
 
-**Build & Release (`.github/workflows/build-release.yml`)**
-- Triggered on pushes to `debian/unstable` or workflow dispatch
+**Build & Test (`.github/workflows/build-test.yml`)**
+- Triggered on pushes to `main` or `debian/unstable`, or workflow dispatch
 - Builds packages for multiple Debian distributions: bookworm, bullseye, trixie
-- Uses appropriate Golang containers for each distribution
-- Merges `upstream` branch content before building
+- Checks out `debian/unstable` branch for building (contains upstream source + packaging)
 - Runs tests and captures output in release artifacts
 - **Includes lintian checks** for package quality assurance
 - Creates pre-releases with .deb packages and build artifacts for each distribution
@@ -87,7 +86,7 @@ sudo apt-get install -f  # Fix any dependency issues
 ## Workflow Maintenance
 
 ### Updating Packaging
-1. Modify files in `/debian/` directory
+1. Modify files in `/debian/` directory on `debian/unstable` branch
 2. Update `debian/changelog` with new entry using `dch -i`
 3. Commit changes to `debian/unstable` branch
 4. Push to trigger automated builds
@@ -96,7 +95,7 @@ sudo apt-get install -f  # Fix any dependency issues
 ```bash
 # If automatic updater fails, manually import upstream
 git checkout debian/unstable
-gbp import-orig --uscan --upstream-branch=upstream --debian-branch=debian/unstable --pristine-tar --no-interactive
+gbp import-orig --uscan --merge --replace-imported --upstream-branch=upstream --debian-branch=debian/unstable --pristine-tar --no-interactive
 ```
 
 ### Release Management
@@ -106,12 +105,12 @@ gbp import-orig --uscan --upstream-branch=upstream --debian-branch=debian/unstab
 
 ## Repository Structure Understanding
 
-This is **NOT** the upstream fan2go source code repository. This repository only contains:
-- Debian packaging metadata (`/debian/` directory)
-- Automated workflows for upstream tracking and package building  
-- Git-buildpackage branch structure for maintaining pristine upstream sources
+This repository contains:
+- **`main` branch**: Automation workflows (.github/workflows/) and documentation (README.debian.md, CLAUDE.md)
+- **`debian/unstable` branch**: Current upstream source code + debian/ packaging directory
+- **`upstream` branch**: Pristine upstream source imports
 
-The actual fan2go source code is maintained separately at https://github.com/markusressel/fan2go and is automatically imported into the `upstream` branch.
+The actual fan2go source code is maintained separately at https://github.com/markusressel/fan2go and is automatically imported and merged into the `debian/unstable` branch for packaging.
 
 ## DEP-14 Compliance
 

@@ -6,8 +6,9 @@ This repository contains Debian packaging for the [fan2go](https://github.com/ma
 
 This is a DEP-14 compliant packaging repository with the following branch structure:
 
+- `main` - Repository automation (.github/workflows/) and documentation
 - `upstream` - Pristine upstream source code
-- `debian/unstable` - Debian packaging for unstable/sid (main development branch)
+- `debian/unstable` - Upstream source + debian/ packaging directory
 - `pristine-tar` - Pristine tar metadata for reproducible source packages
 
 ## Building
@@ -90,17 +91,18 @@ See `go.mod` in the upstream source for the complete list.
 ### Upstream Tracking (.github/workflows/updater.yml)
 
 - Monitors upstream releases using `uscan`
-- Automatically imports new upstream versions using `gbp import-orig`
+- Automatically imports new upstream versions using `gbp import-orig --merge`
 - Updates the upstream and debian/unstable branches
-- Can trigger automated builds for new releases
+- Triggers automated builds for new releases
 
 ### Build Testing (.github/workflows/build-test.yml)
 
 - Tests package building for multiple Debian releases (bookworm, bullseye, trixie)
+- Checks out debian/unstable branch for building
 - Uses debian:trixie container for consistent build environment
 - Runs lintian checks on generated packages
 - Captures test output for debugging
-- Can optionally create GitHub releases
+- Creates GitHub releases with build artifacts
 
 ## Installation
 
@@ -148,7 +150,7 @@ To modify packaging:
 4. Update changelog: `dch -i`
 
 For upstream updates:
-1. Use `gbp import-orig --uscan` to import new versions
+1. Use `gbp import-orig --uscan --merge` to import new versions
 2. Resolve any packaging conflicts
 3. Test build and update packaging as needed
 
