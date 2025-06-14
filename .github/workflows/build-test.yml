@@ -51,7 +51,11 @@ jobs:
             echo "===== LAST 100 TEST LINES ====="
             tail -n 100 test-output.log
             echo "==============================="
-            dpkg-buildpackage -us -uc
+            # Use -nc (no clean) to skip broken upstream clean rule
+            # fan2go's Makefile:34 does 'rm "bin/fan2go"' without -f flag
+            # This fails on fresh checkout where bin/fan2go doesn't exist
+            # TODO: Remove -nc when upstream fixes clean rule to use 'rm -f'
+            dpkg-buildpackage -us -uc -nc
             echo "===== LINTIAN CHECKS ====="
             lintian ../*.deb ../*.dsc || true
             echo "=========================="
