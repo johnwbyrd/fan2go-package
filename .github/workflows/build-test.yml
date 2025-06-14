@@ -49,8 +49,6 @@ jobs:
             echo "new_upstream=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Merge upstream
-        run: git merge origin/upstream
 
       - name: Build in container
         uses: addnab/docker-run-action@v3
@@ -59,16 +57,9 @@ jobs:
           options: -v ${{ github.workspace }}:/workspace -w /workspace
           run: |
             apt-get update
-            apt-get install -y devscripts lintian golang-go
+            apt-get install -y devscripts git-buildpackage lintian golang-go
             apt-get build-dep -y .
-            
-            # Run tests manually since dh_auto_test environment is broken
-            echo "===== RUNNING FAN2GO TESTS ====="
-            make test > test-output.log 2>&1 || true
-            echo "===== LAST 100 TEST LINES ====="
-            tail -n 100 test-output.log
-            echo "==============================="
-            dpkg-buildpackage -us -uc
+            gbp buildpackage --git-upstream-branch=upstream --git-debian-branch=debian/unstable -us -uc
             echo "===== LINTIAN CHECKS ====="
             lintian ../*.deb ../*.dsc || true
             echo "=========================="
