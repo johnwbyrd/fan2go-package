@@ -1,0 +1,171 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+This is a **Debian packaging repository** for fan2go using the `git-buildpackage` (gbp) workflow. The repository creates and maintains Debian packages for the upstream fan2go project (https://github.com/markusressel/fan2go) with automated upstream tracking and multi-distribution builds.
+
+**Repository URL**: https://github.com/johnwbyrd/fan2go-package
+
+## Git-Buildpackage Architecture
+
+This repository follows the standard Debian `git-buildpackage` branch structure:
+
+### Branch Layout
+- **`upstream`**: Contains pristine upstream source code from markusressel/fan2go
+- **`debian/unstable`**: Main packaging branch with Debian-specific files (DEP-14 compliant)
+- **`pristine-tar`**: Stores compressed tarballs for reproducible builds
+- **`main`**: Repository metadata and documentation
+- **`backup-pre-dep14`**: Backup of previous debian/sid structure
+
+### Automated Workflows
+
+**Upstream Updater (`.github/workflows/updater.yml`)**
+- Runs daily at midnight UTC and on workflow dispatch
+- Uses `gbp import-orig --uscan` to check for new upstream releases
+- Automatically imports new versions to the `upstream` branch
+- Updates `debian/unstable` branch when new versions are found
+- Leverages `debian/watch` file to monitor https://github.com/markusressel/fan2go/tags
+
+**Build & Release (`.github/workflows/build-release.yml`)**
+- Triggered on pushes to `debian/unstable` or workflow dispatch
+- Builds packages for multiple Debian distributions: bookworm, bullseye, trixie
+- Uses appropriate Golang containers for each distribution
+- Merges `upstream` branch content before building
+- Runs tests and captures output in release artifacts
+- **Includes lintian checks** for package quality assurance
+- Creates pre-releases with .deb packages and build artifacts for each distribution
+
+## Packaging Commands
+
+### Local Development
+```bash
+# Build package locally
+dpkg-buildpackage -us -uc
+
+# Build with git-buildpackage
+gbp buildpackage --git-upstream-branch=upstream --git-debian-branch=debian/unstable
+
+# Import new upstream version manually
+gbp import-orig --uscan --upstream-branch=upstream --debian-branch=debian/unstable --pristine-tar
+
+# Check for upstream updates
+uscan --verbose --report
+```
+
+### Testing Package Installation
+```bash
+# After building, test the .deb package
+sudo dpkg -i ../fan2go_*.deb
+sudo apt-get install -f  # Fix any dependency issues
+```
+
+## Debian Package Configuration
+
+### Key Files in `/debian/`
+- **`control`**: Package metadata, dependencies, maintainer info
+- **`rules`**: Build process automation (uses dh with golang support)
+- **`changelog`**: Version history and release notes
+- **`watch`**: Upstream version monitoring configuration
+- **`gbp.conf`**: Git-buildpackage configuration
+- **`fan2go.install`**: File installation mapping
+- **`fan2go.service`**: Systemd service definition
+- **`fan2go.yaml`**: Default configuration template
+
+### Build Dependencies
+- `debhelper-compat (= 13)`
+- `dh-golang`
+- `golang-1.23 (>= 1.23.1)`
+- `libsensors-dev`
+- `help2man`
+
+### Runtime Dependencies
+- `lm-sensors`
+- `systemd`
+
+## Workflow Maintenance
+
+### Updating Packaging
+1. Modify files in `/debian/` directory
+2. Update `debian/changelog` with new entry using `dch -i`
+3. Commit changes to `debian/unstable` branch
+4. Push to trigger automated builds
+
+### Manual Upstream Update
+```bash
+# If automatic updater fails, manually import upstream
+git checkout debian/unstable
+gbp import-orig --uscan --upstream-branch=upstream --debian-branch=debian/unstable --pristine-tar --no-interactive
+```
+
+### Release Management
+- Pre-releases are created automatically for each distribution build
+- Full releases should be created manually after testing
+- Each distribution gets its own build artifact
+
+## Repository Structure Understanding
+
+This is **NOT** the upstream fan2go source code repository. This repository only contains:
+- Debian packaging metadata (`/debian/` directory)
+- Automated workflows for upstream tracking and package building  
+- Git-buildpackage branch structure for maintaining pristine upstream sources
+
+The actual fan2go source code is maintained separately at https://github.com/markusressel/fan2go and is automatically imported into the `upstream` branch.
+
+## DEP-14 Compliance
+
+This repository follows DEP-14 (Debian Enhancement Proposal 14) standards:
+
+- **Branch naming**: Uses `debian/unstable` instead of non-standard `debian/sid`
+- **Tag format**: Follows `upstream/<version>` and `debian/<version>` patterns  
+- **Automated workflows**: Updated to work with DEP-14 branch structure
+- **Lintian integration**: Package quality checks included in build process
+
+The previous `debian/sid` structure has been preserved in the `backup-pre-dep14` branch for reference.
+
+## Go Modules + Debian Packaging Challenges
+
+This project encountered several challenges packaging a Go modules project with dh-golang:
+
+### Key Issues and Solutions
+
+**1. dh-golang vs Go Modules Compatibility**
+- `dh-golang` was designed for GOPATH, not Go modules
+- Required `GO111MODULE=on` and `GOPROXY=https://proxy.golang.org,direct`
+- Needed `DH_GOLANG_BUILDPKG := ./cmd/...` to avoid analyzing module cache
+
+**2. Test Environment Problems**
+- `dh_auto_test` with Go modules tests ALL dependencies, not just project code
+- Created ANSI spam from dependency tests (github.com/mgutz/ansi)
+- Solution: Override `dh_auto_test` and run manual tests before dpkg-buildpackage
+
+**3. Build Target Issues**
+- `dh_auto_build` runs `make` without target, doesn't build binary by default
+- Required `override_dh_auto_build: $(MAKE) build` to create executable
+- Upstream clean rule uses `rm` without `-f`, fails on fresh checkout
+
+**4. Critical Environment Variables**
+```bash
+export GO111MODULE := on                           # Enable Go modules  
+export GOPROXY := https://proxy.golang.org,direct  # Allow dependency downloads
+export DH_GOPKG := github.com/markusressel/fan2go  # Go import path
+export DH_GOLANG_BUILDPKG := ./cmd/...             # Limit analysis scope
+```
+
+### Working debian/rules Pattern
+
+For Go modules projects, use these overrides:
+```bash
+override_dh_auto_build:
+	$(MAKE) build
+
+override_dh_auto_test:
+	# Skip or run diagnostics - dh environment breaks module resolution
+```
+
+### Future Improvements
+
+- Replace GOPROXY workaround with proper Debian-packaged Go dependencies
+- Consider using debian:trixie for all builds (has golang-1.24 natively)
+- May need per-distribution branches when more complex packaging required

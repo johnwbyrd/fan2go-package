@@ -1,0 +1,79 @@
+name: Upstream Updater
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/updater.yml'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    outputs:
+      NEW_UPSTREAM: ${{ steps.check_upstream.outputs.NEW_UPSTREAM }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.UPDATE_PAT }}
+
+      - name: Set up branches
+        run: |
+          git checkout -b upstream origin/upstream || git checkout upstream
+          git checkout -b debian/unstable origin/debian/unstable || git checkout debian/unstable
+
+      - name: Setup dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y devscripts git-buildpackage
+
+      - name: Import new upstream version
+        run: |
+          git config user.name "Automatic Packaging GitHub Action"
+          git config user.email "actions@github.com"
+          
+          # Check if there's a new upstream version
+          echo "Checking for new upstream versions..."
+          if uscan --verbose --report-status 2>&1 | grep -q "Newer package available"; then
+            echo "New upstream version found, importing..."
+            gbp import-orig --uscan --merge \
+              --upstream-branch=upstream \
+              --debian-branch=debian/unstable \
+              --pristine-tar \
+              --no-interactive
+            
+            # Push upstream branch and tags (DEP-14 format: upstream/<version>)
+            git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" upstream
+            git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" --tags
+            
+            # Push debian/unstable branch
+            git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" debian/unstable
+            
+            echo "NEW_UPSTREAM=true" >> $GITHUB_OUTPUT
+          else
+            echo "No new upstream version found - this is normal and expected"
+            echo "Action completed successfully"
+            echo "NEW_UPSTREAM=false" >> $GITHUB_OUTPUT
+          fi
+        id: check_upstream
+
+      - name: Push pristine-tar updates
+        run: |
+          # Push pristine-tar branch if it exists
+          if git show-ref --verify --quiet refs/heads/pristine-tar; then
+            git push "https://token:${{ secrets.UPDATE_PAT }}@github.com/${{ github.repository }}.git" pristine-tar
+          fi
+
+  build_and_release:
+    needs: update
+    if: needs.update.outputs.NEW_UPSTREAM == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/build-test.yml
+    with:
+      create_release: true

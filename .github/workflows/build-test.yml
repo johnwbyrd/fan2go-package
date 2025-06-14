@@ -1,0 +1,128 @@
+name: Build and Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create GitHub release after successful build'
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [main, debian/unstable]
+    paths:
+      - 'debian/**'
+      - '.github/workflows/**'
+      - '!**/README.md'
+  workflow_call:
+    inputs:
+      create_release:
+        description: 'Create GitHub release after successful build'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        distro: [bookworm, bullseye, trixie]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: debian/unstable
+          fetch-depth: 0
+
+      - name: Check upstream
+        id: upstream
+        run: |
+          if ! uscan --report --dehs; then
+            echo "New upstream version detected"
+            echo "new_upstream=true" >> $GITHUB_OUTPUT
+          else
+            echo "No upstream changes found"
+            echo "new_upstream=false" >> $GITHUB_OUTPUT
+          fi
+
+
+      - name: Build in container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: debian:trixie
+          # Mount GitHub workspace (includes .git) to /workspace and set as working dir
+          options: -v ${{ github.workspace }}:/workspace -w /workspace
+          run: |
+            apt-get update
+            apt-get install -y devscripts git-buildpackage lintian golang-go
+            apt-get build-dep -y .
+            
+            # Configure git for container environment
+            # /workspace is the mount point we defined above in options
+            git config --global user.name "GitHub Actions"
+            git config --global user.email "actions@github.com"
+            git config --global --add safe.directory /workspace
+            
+            gbp buildpackage --git-upstream-branch=upstream --git-debian-branch=debian/unstable --git-ignore-new -us -uc
+            
+            echo "===== CHECKING BUILD OUTPUTS ====="
+            if ls ../*.deb 1> /dev/null 2>&1; then
+              echo "✓ .deb files found:"
+              ls -la ../*.deb
+            else
+              echo "✗ No .deb files found - build failed"
+              exit 1
+            fi
+            
+            if ls ../*.dsc 1> /dev/null 2>&1; then
+              echo "✓ .dsc files found:"
+              ls -la ../*.dsc
+            else
+              echo "✗ No .dsc files found - build failed"
+              exit 1
+            fi
+            echo "================================="
+            
+            echo "===== LINTIAN CHECKS ====="
+            lintian ../*.deb ../*.dsc || true
+            echo "=========================="
+            echo "===== BUILD ARTIFACTS ====="
+            ls -la ../
+            echo "===== WORKSPACE CONTENTS ====="
+            find . -name "fan2go" -type f 2>/dev/null || true
+            ls -la bin/ 2>/dev/null || true
+            ls -la debian/tmp/ 2>/dev/null || true
+            echo "============================"
+
+      - name: Copy artifacts from parent directory
+        run: |
+          mkdir -p artifacts
+          cp ../*.deb artifacts/ 2>/dev/null || true
+          cp ../*.dsc artifacts/ 2>/dev/null || true  
+          cp ../*.tar.xz artifacts/ 2>/dev/null || true
+          cp ../*.buildinfo artifacts/ 2>/dev/null || true
+          cp ../*.changes artifacts/ 2>/dev/null || true
+          cp test-output.log artifacts/ 2>/dev/null || true
+
+      - name: Create release
+        if: |
+          inputs.create_release == true ||
+          steps.upstream.outputs.new_upstream == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          name: fan2go-${{ matrix.distro }}-$(date +%Y%m%d)
+          tag_name: build-${{ matrix.distro }}-${{ github.run_id }}
+          body: |
+            Debian ${{ matrix.distro }} build
+            Source: ${{ github.sha }}
+            
+            This is an automated build from the debian/unstable branch.
+            Lintian checks have been run - see attached logs for details.
+          files: artifacts/*
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
