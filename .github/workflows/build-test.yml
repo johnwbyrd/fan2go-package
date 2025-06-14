@@ -9,11 +9,9 @@ on:
         default: false
         type: boolean
   push:
-    branches: [main, debian/unstable]
+    branches: [debian/unstable]
     paths:
       - 'debian/**'
-      - '.github/workflows/**'
-      - '!**/README.md'
   workflow_call:
     inputs:
       create_release:
