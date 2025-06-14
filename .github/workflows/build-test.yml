@@ -35,6 +35,17 @@ jobs:
           ref: debian/unstable
           fetch-depth: 0
 
+      - name: Check upstream
+        id: upstream
+        run: |
+          if ! uscan --report --dehs; then
+            echo "New upstream version detected"
+            echo "new_upstream=true" >> $GITHUB_OUTPUT
+          else
+            echo "No upstream changes found"
+            echo "new_upstream=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Merge upstream
         run: git merge origin/upstream
 
@@ -81,7 +92,9 @@ jobs:
           cp test-output.log artifacts/ 2>/dev/null || true
 
       - name: Create release
-        if: inputs.create_release == true || inputs.create_release == 'true'
+        if: |
+          inputs.create_release == true ||
+          steps.upstream.outputs.new_upstream == 'true'
         uses: softprops/action-gh-release@v1
         with:
           name: fan2go-${{ matrix.distro }}-$(date +%Y%m%d)
