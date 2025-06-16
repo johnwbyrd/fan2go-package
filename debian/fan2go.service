@@ -52,7 +52,7 @@ NoNewPrivileges=true
 # === FILESYSTEM ISOLATION ===
 # Creates a private /tmp directory that's isolated from the host system's /tmp
 # Prevents symlink attacks and temporary file collisions with other processes
-PrivateTmp=truesystemd-analyze security fan2go
+PrivateTmp=true
 
 # Makes user home directories (/home, /root) inaccessible to the service
 # Protects user data from being accessed by the fan control daemon
