@@ -11,11 +11,17 @@ export GOPROXY := https://proxy.golang.org,direct
 override_dh_auto_build:
 	$(MAKE) build
 
+# The test target is run during the build process, so we override it to capture output
+# Unfortunately GitHub Actions gets upset if a process spews more than 4MB of output
+# so we limit the output to the last 100 lines -- don't worry, it's not very
+# interesting anyway, and we save the full output to a file in case you need it
 override_dh_auto_test:
 	$(MAKE) test > test-output.log 2>&1 || true
 	@echo "===== TEST RESULTS (last 100 lines) ====="
 	@tail -n 100 test-output.log
 	@echo "===== END TEST RESULTS ====="
 
+# Unfortunately, make clean for fan2go dies if no build currently exists
+# so we override it to ignore errors
 override_dh_auto_clean:
 	$(MAKE) clean || true

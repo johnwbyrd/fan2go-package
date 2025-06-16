@@ -1,3 +1,8 @@
+fan2go (0.10.0-2) unstable; urgency=medium
+
+  * Improved security of fan2go service using a tighter systemd
+    configuration.
+
 fan2go (0.10.0-1) unstable; urgency=medium
 
   * Initial release under fan2go-packaging system.
