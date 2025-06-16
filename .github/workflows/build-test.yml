@@ -67,24 +67,24 @@ jobs:
             
             gbp buildpackage --git-export-dir=/build-area --git-ignore-new --git-upstream-branch=upstream --git-debian-branch=debian/unstable -us -uc
             
-            echo "===== CHECKING BUILD OUTPUTS ====="
-            ls -la /build-area/fan2go* || exit 1
+            echo "Outputs from the build are:"
+            ls -la /build-area/* || exit 1
             
-            echo "===== LINTIAN CHECKS ====="
+            echo "Running lintian on the built packages..."
             lintian /build-area/*.deb /build-area/*.dsc || true
             
             echo "===== MOVING ARTIFACTS TO WORKSPACE ====="
             echo "Current working directory:"
             pwd
             echo "Contents of /build-area:"
-            ls -la /build-area/ || echo "No /build-area directory"
+            ls -laR /build-area/ || echo "No /build-area directory"
             echo "Contents of /workspace:"
-            ls -la /workspace/ || echo "No /workspace directory"
+            ls -laR /workspace/ || echo "No /workspace directory"
             
             mkdir -p /workspace/artifacts
             mv /build-area/fan2go* /workspace/artifacts/
             echo "Artifacts moved to workspace:"
-            ls -la /workspace/artifacts/
+            ls -laR /workspace/artifacts/
             
 
       - name: Verify artifacts and extract version
