@@ -1,18 +1,314 @@
+# ==============================
+# Fan2go Hardware Fan Control Service
+# ==============================
+# This service file provides a more secure configuration for the fan2go daemon
+# with security hardening using systemd features.
+
 [Unit]
-Description=fan2go system fan controller
-After=network.target lm_sensors.service
-Wants=lm_sensors.service
+# Human-readable name and description of the service
+Description=Fan2go hardware fan control daemon
+# Link to documentation for users and administrators
+Documentation=https://github.com/markusressel/fan2go
+# Start this service after the multi-user target is reached (basic system is ready)
+After=multi-user.target
+# This service should be started when multi-user.target is activated
+Wants=multi-user.target
 
 [Service]
-Type=simple
-ExecStart=/usr/bin/fan2go --config /etc/fan2go/fan2go.yaml
-Restart=on-failure
+# ==============================
+# === BASIC SERVICE CONFIGURATION ===
+# ==============================
 
-# Security Hardening
-ProtectSystem=strict
-PrivateTmp=true
+# Service type - 'simple' means the process doesn't fork and runs in foreground
+Type=simple
+
+# Command to execute when starting the service
+ExecStart=/usr/bin/fan2go
+
+# Always restart the service if it exits (except manual stops)
+Restart=always
+
+# Wait 10 seconds before restarting if the service fails
+RestartSec=10
+
+# Run as root user (required for hardware access)
+User=root
+
+# Run as root group
+Group=root
+
+# ==============================
+# === SYSTEMD SECURITY HARDENING ===
+# ==============================
+# These directives create a secure "sandbox" for the service using Linux kernel features.
+# Each setting restricts what the service can do, following the principle of least privilege.
+# Reference: systemd.exec(5) man page for complete documentation
+
+# === PRIVILEGE ESCALATION PROTECTION ===
+# Prevents the service from gaining additional privileges through setuid/setgid binaries
+# or other privilege escalation mechanisms. This is a fundamental security protection.
 NoNewPrivileges=true
-ReadWritePaths=/var/lib/fan2go /var/log/fan2go /sys/class/hwmon /sys/devices/platform
+
+# === FILESYSTEM ISOLATION ===
+# Creates a private /tmp directory that's isolated from the host system's /tmp
+# Prevents symlink attacks and temporary file collisions with other processes
+PrivateTmp=truesystemd-analyze security fan2go
+
+# Makes user home directories (/home, /root) inaccessible to the service
+# Protects user data from being accessed by the fan control daemon
+ProtectHome=true
+
+# Makes most of the filesystem read-only, we'll explicitly allow write access where needed
+# 'strict' makes everything read-only except /proc, /sys, /dev and explicitly allowed paths
+# This prevents the service from modifying system files it shouldn't touch
+ProtectSystem=strict
+
+# === DIRECTORY MANAGEMENT ===
+# Systemd will automatically create and manage these directories with proper ownership
+# and permissions. This is safer than manually creating directories.
+
+# Creates /run/fan2go automatically for runtime files (PID files, sockets, etc.)
+RuntimeDirectory=fan2go
+# Set directory permissions for runtime directory
+RuntimeDirectoryMode=0755
+
+# Creates /var/lib/fan2go automatically for persistent state and data
+StateDirectory=fan2go
+# Set directory permissions for state directory
+StateDirectoryMode=0755
+
+# Creates /var/log/fan2go automatically if service writes its own logs
+LogsDirectory=fan2go
+# Set directory permissions for logs directory
+LogsDirectoryMode=0755
+
+# Creates /etc/fan2go automatically for service configuration files
+ConfigurationDirectory=fan2go
+# Set directory permissions for configuration directory
+ConfigurationDirectoryMode=0755
+
+# === HARDWARE ACCESS CONFIGURATION ===
+# These settings allow necessary hardware access while maintaining security
+
+# Allow access to physical devices (required for fan and temperature sensor control)
+# Setting to 'true' would block all device access, breaking fan control functionality
+PrivateDevices=false
+
+# Explicitly control which device types the service can access
+# This implements a whitelist approach - only allow necessary device types
+
+# Standard null device
+DeviceAllow=/dev/null rw
+# Standard zero device  
+DeviceAllow=/dev/zero rw
+# Random number generator (read-only)
+DeviceAllow=/dev/urandom r
+# Hardware monitoring devices (fans, temps, PWM)
+DeviceAllow=char-hwmon rw
+# Thermal management devices
+DeviceAllow=char-thermal rw
+# I2C bus devices (some fan controllers use this)
+DeviceAllow=char-i2c rw
+# Miscellaneous character devices
+DeviceAllow=char-misc rw
+
+# === FILESYSTEM ACCESS CONTROL ===
+# Define exactly which directories the service can read from and write to
+
+# Allow read-write access to hardware control interfaces
+# Hardware monitoring (fans, temperatures, PWM controls)
+ReadWritePaths=/sys/class/hwmon
+# Thermal zones and cooling devices
+ReadWritePaths=/sys/class/thermal
+# Device tree (needed for some hardware access)
+ReadWritePaths=/sys/devices
+
+# Allow read-only access to system information
+# System bus information
+ReadOnlyPaths=/sys/bus
+# CPU information (may be needed for thermal management)
+ReadOnlyPaths=/proc/cpuinfo
+# Memory information
+ReadOnlyPaths=/proc/meminfo
+
+# === NETWORK SECURITY ===
+# Configure network access - default to localhost only for security
+# This allows fan2go's optional web interface while blocking external access
+
+# Allow network access (needed for optional web interface)
+PrivateNetwork=false
+
+# Restrict to specific address families (IPv4, IPv6, and Unix sockets only)
+# Blocks other protocol families like packet sockets, netlink, etc.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# LOCALHOST ONLY ACCESS (default secure configuration)
+# Block all IP traffic by default, then allow specific localhost ranges
+IPAddressDeny=any
+# Allow 127.0.0.1 and ::1
+IPAddressAllow=localhost
+# Allow entire IPv4 loopback range
+IPAddressAllow=127.0.0.0/8
+# Allow IPv6 loopback
+IPAddressAllow=::1/128
+
+# NETWORK ACCESS EXAMPLES (all commented out for security)
+# WARNING: Only enable network access if you need remote monitoring and understand the security implications
+# Consider using a reverse proxy with authentication instead of exposing fan2go directly
+#
+# Example 1: Allow access from local network only
+# IPAddressAllow=192.168.1.0/24   # Allow local subnet (adjust to your network)
+# IPAddressAllow=10.0.0.0/8       # Allow RFC1918 private networks
+# IPAddressAllow=172.16.0.0/12    # Allow RFC1918 private networks
+#
+# Example 2: Allow access from specific IP addresses only  
+# IPAddressAllow=192.168.1.100    # Allow specific IP address
+# IPAddressAllow=203.0.113.0/24   # Allow specific public subnet
+#
+# Example 3: Allow all access (NOT RECOMMENDED - removes network security)
+# IPAddressDeny=                   # Remove the deny-all rule
+# IPAddressAllow=any               # Allow all networks (DANGEROUS)
+#
+# NOTE: If you enable network access, consider additional security measures:
+# - Use fan2go's built-in authentication if available
+# - Set up a reverse proxy (nginx, Apache) with proper authentication
+# - Use VPN access instead of exposing the service directly
+# - Monitor access logs for suspicious activity
+# - Keep fan2go updated to latest version for security patches
+
+# === KERNEL PROTECTION ===
+# Prevent the service from modifying kernel parameters and accessing kernel internals
+
+# Prevents writing to /proc/sys/* (kernel tunables)
+# Blocks modification of kernel parameters like network settings, memory management, etc.
+ProtectKernelTunables=true
+
+# Prevents loading or unloading kernel modules
+# Stops the service from modifying the running kernel
+ProtectKernelModules=true
+
+# Denies access to kernel log buffer (/proc/kmsg, /dev/kmsg)
+# Prevents reading potentially sensitive kernel messages
+ProtectKernelLogs=true
+
+# Prevents modification of cgroup filesystem
+# Blocks changes to process grouping and resource control
+ProtectControlGroups=true
+
+# === PROCESS AND MEMORY PROTECTION ===
+# Restrict what the service can do with processes and memory
+
+# Prevents creating memory mappings that are both writable and executable
+# This helps prevent code injection attacks and JIT-spray attacks
+MemoryDenyWriteExecute=true
+
+# Prevents setting realtime scheduling policies
+# Blocks the service from gaining high-priority scheduling that could affect system responsiveness
+RestrictRealtime=true
+
+# Prevents creating files with setuid/setgid bits
+# Stops the service from creating privilege escalation mechanisms
+RestrictSUIDSGID=true
+
+# Removes IPC objects (shared memory, message queues) when service stops
+# Cleans up inter-process communication resources
+RemoveIPC=true
+
+# === NAMESPACE ISOLATION ===
+# Control which system namespaces the service can access
+
+# Keep access to user namespace (may be needed for device access as root)
+# Setting to 'true' would create an isolated user namespace
+PrivateUsers=false
+
+# Prevents changing system hostname
+# Service cannot modify the system's network identity
+ProtectHostname=true
+
+# Prevents changing system clock
+# Service cannot modify system time settings
+ProtectClock=true
+
+# === CAPABILITY RESTRICTIONS ===
+# Linux capabilities divide root privileges into specific, granular permissions
+# We restrict the service to only the capabilities it actually needs
+
+# Limit the service to specific Linux capabilities (fine-grained root permissions)
+# CAP_DAC_OVERRIDE:  Bypass file permission checks (may need for device access)
+# CAP_FOWNER:        Bypass permission checks for file ownership operations  
+# CAP_SYS_RAWIO:     Perform raw I/O operations (required for direct hardware access)
+# CAP_CHOWN:         Change file ownership (may need for creating runtime files)
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_FOWNER CAP_SYS_RAWIO CAP_CHOWN
+
+# Grant ambient capabilities that are automatically inherited by child processes
+# CAP_SYS_RAWIO is essential for hardware I/O operations
+AmbientCapabilities=CAP_SYS_RAWIO
+
+# === SYSTEM CALL FILTERING ===
+# Control which system calls (kernel functions) the service can make
+
+# Allow standard system calls needed by typical system services
+# This includes basic file operations, memory management, process control, etc.
+SystemCallFilter=@system-service
+
+# Explicitly deny dangerous system call groups using ~ (negation)
+# @debug:         Debugging and profiling calls (ptrace, etc.)
+# @mount:         Filesystem mounting operations
+# @cpu-emulation: CPU emulation calls
+# @obsolete:      Deprecated/obsolete system calls
+# @privileged:    Privileged operations (mostly covered by capabilities)
+# @reboot:        System reboot/shutdown calls
+# @swap:          Memory swapping operations  
+# @resources:     Resource limit modifications
+# @raw-io:        Raw I/O operations (some overlap with @privileged)
+SystemCallFilter=~@debug @mount @cpu-emulation @obsolete @privileged @reboot @swap @resources @raw-io
+
+# Return "Permission denied" error for blocked system calls instead of killing the process
+# This provides more graceful error handling
+SystemCallErrorNumber=EPERM
+
+# === RESOURCE LIMITS ===
+# Prevent the service from consuming excessive system resources
+
+# Limit memory usage to 256MB (adjust based on your system and fan2go's needs)
+# This prevents memory leaks from affecting the entire system
+MemoryMax=256M
+
+# Limit number of processes/threads the service can create
+# Prevents fork bombs and runaway process creation
+TasksMax=50
+
+# Limit number of open file descriptors
+# Prevents file descriptor exhaustion
+LimitNOFILE=1024
 
 [Install]
+# === INSTALLATION CONFIGURATION ===
+# When this service is enabled, add it as a dependency of multi-user.target
+# This means it will start automatically when the system reaches multi-user mode
 WantedBy=multi-user.target
+
+# ==============================
+# === SECURITY NOTES ===
+# ==============================
+#
+# This configuration follows these security practices:
+# 1. Principle of least privilege - only grant minimum necessary permissions
+# 2. Defense in depth - multiple security layers work together
+# 3. Fail secure - blocked operations return errors rather than crashing
+#
+# Testing recommendations:
+# 1. Use 'systemd-analyze security fan2go' to check security score
+# 2. Monitor logs with 'journalctl -u fan2go -f' during startup
+# 3. Test all fan control functionality after applying restrictions
+# 4. Use 'strace' to identify missing permissions if issues occur
+#
+# Compatibility:
+# - Requires systemd 233+ for all features
+# - Older systemd versions will ignore unknown directives
+# - Some features require specific kernel support (namespaces, seccomp, etc.)
+#
+# For debugging:
+# - Temporarily remove SystemCallFilter to check for blocked system calls
+# - Use 'systemctl show fan2go' to see active security settings
+# - Check 'journalctl -u fan2go' for permission denied errors
