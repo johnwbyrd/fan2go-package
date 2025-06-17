@@ -1,12 +1,12 @@
 # ==============================
 # Fan2go Hardware Fan Control Service
 # ==============================
-# This service file provides a more secure configuration for the fan2go daemon
-# with security hardening using systemd features.
+# This service file provides secure configuration for the fan2go daemon
+# with comprehensive security hardening using systemd features.
 
 [Unit]
 # Human-readable name and description of the service
-Description=Fan2go hardware fan control daemon
+Description=fan2go hardware fan control daemon
 # Link to documentation for users and administrators
 Documentation=https://github.com/markusressel/fan2go
 # Start this service after the multi-user target is reached (basic system is ready)
@@ -130,6 +130,16 @@ ReadOnlyPaths=/sys/bus
 ReadOnlyPaths=/proc/cpuinfo
 # Memory information
 ReadOnlyPaths=/proc/meminfo
+
+# libsensors library requirements
+# Main configuration file (required by gosensors Init() function)
+ReadOnlyPaths=/etc/sensors3.conf
+# Alternative configuration file locations
+ReadOnlyPaths=/etc/sensors.conf
+ReadOnlyPaths=/usr/local/etc/sensors3.conf
+# libsensors may need access to module information
+ReadOnlyPaths=/proc/modules
+ReadOnlyPaths=/sys/module
 
 # === NETWORK SECURITY ===
 # Configure network access - default to localhost only for security
@@ -292,7 +302,7 @@ WantedBy=multi-user.target
 # === SECURITY NOTES ===
 # ==============================
 #
-# This configuration follows these security practices:
+# This configuration follows security practices:
 # 1. Principle of least privilege - only grant minimum necessary permissions
 # 2. Defense in depth - multiple security layers work together
 # 3. Fail secure - blocked operations return errors rather than crashing
