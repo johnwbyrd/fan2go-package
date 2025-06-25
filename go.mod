@@ -5,6 +5,7 @@ go 1.23.1
 toolchain go1.24.1
 
 require (
+	github.com/NVIDIA/go-nvml v0.12.9-0
 	github.com/asecurityteam/rolling v2.0.4+incompatible
 	github.com/guptarohit/asciigraph v0.7.3
 	github.com/labstack/echo-contrib v0.17.4
@@ -15,7 +16,6 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/natefinch/atomic v1.0.1
-	github.com/NVIDIA/go-nvml v0.12.4-1
 	github.com/oklog/run v1.1.0
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/prometheus/client_golang v1.22.0
@@ -25,7 +25,7 @@ require (
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
 	github.com/tomlazar/table v0.1.2
-	go.etcd.io/bbolt v1.4.0
+	go.etcd.io/bbolt v1.4.1
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
 )
 

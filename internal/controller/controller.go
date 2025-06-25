@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/markusressel/fan2go/internal/control_loop"
 	"golang.org/x/exp/maps"
 	"math"
@@ -278,8 +277,8 @@ func (f *DefaultFanController) runInitializationIfNeeded() (map[int]float64, err
 	ui.Info("Loading fan curve data for fan '%s'...", fan.GetId())
 	fanRpmData, err := f.persistence.LoadFanRpmData(fan)
 	if err != nil {
-		_, ok := fan.(*fans.HwMonFan)
-		if ok {
+		config := fan.GetConfig()
+		if config.HwMon != nil || config.Nvidia != nil {
 			ui.Warning("Fan '%s' has not yet been analyzed, starting initialization sequence...", fan.GetId())
 			err = f.RunInitializationSequence()
 			if err != nil {
@@ -291,8 +290,10 @@ func (f *DefaultFanController) runInitializationIfNeeded() (map[int]float64, err
 				f.restoreControlMode()
 				return nil, err
 			}
-		} else {
-			err = f.persistence.SaveFanRpmData(fan)
+		} else { // file/cmd fan
+			if fan.GetFanRpmCurveData() != nil {
+				err = f.persistence.SaveFanRpmData(fan)
+			}
 		}
 	}
 	return fanRpmData, err
@@ -583,7 +584,7 @@ func (f *DefaultFanController) ensureNoThirdPartyIsMessingWithUs() {
 
 	if !f.fan.Supports(fans.FeaturePwmSensor) {
 		// we cannot read the PWM value, so we also cannot check if third party changed the PWM value
-		ui.Warning("Fan %s does not support PWM sensor reading, cannot check for third party changes to the PWM value", f.fan.GetId())
+		ui.Debug("Fan %s does not support PWM sensor reading, cannot check for third party changes to the PWM value", f.fan.GetId())
 		return
 	}
 
@@ -691,30 +692,9 @@ func (f *DefaultFanController) computePwmMap() (err error) {
 
 	var configOverride *map[int]int
 
-	switch f := f.fan.(type) {
-	case *fans.HwMonFan:
-		c := f.Config.PwmMap
-		if c != nil {
-			configOverride = c
-		}
-	case *fans.CmdFan:
-		c := f.Config.PwmMap
-		if c != nil {
-			configOverride = c
-		}
-	case *fans.FileFan:
-		c := f.Config.PwmMap
-		if c != nil {
-			configOverride = c
-		}
-	case *fans.NvidiaFan:
-		c := f.Config.PwmMap
-		if c != nil {
-			configOverride = c
-		}
-	default:
-		// if type is other than above
-		fmt.Println("Type is unknown!")
+	c := f.fan.GetConfig().PwmMap
+	if c != nil {
+		configOverride = c
 	}
 
 	if configOverride != nil {
