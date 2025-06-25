@@ -1,3 +1,14 @@
+fan2go (0.11.1-1) unstable; urgency=medium
+
+  [ John Byrd ]
+  * D'oh!  Correct PrivateTmp setting
+  * Allow fan2go to read sensors3.conf
+
+  [ Automatic Packaging GitHub Action ]
+  * New upstream version 0.11.1
+
+ -- Automatic Packaging GitHub Action <actions@github.com>  Wed, 25 Jun 2025 00:26:51 +0000
+
 fan2go (0.10.0-2) unstable; urgency=medium
 
   * Improved security of fan2go service using a tighter systemd
